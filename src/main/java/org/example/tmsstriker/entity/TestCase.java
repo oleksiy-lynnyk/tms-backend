@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -21,8 +23,6 @@ public class TestCase {
     private String title;
     private String preconditions;
     private String description;
-    private String steps;
-    private String expectedResult;
     private String priority;
     private String tags;
     private String state;
@@ -37,11 +37,14 @@ public class TestCase {
     @JoinColumn(name = "suite_id", columnDefinition = "uuid")
     private TestSuite testSuite;
 
-    // === ДОДАНО: projectId ===
     @Column(name = "project_id", columnDefinition = "uuid", nullable = false)
     private UUID projectId;
 
-    // Переоприділи сеттер для suite — встановлює projectId
+    // Додаємо кроки
+    @OneToMany(mappedBy = "testCase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("orderIndex ASC")
+    private List<TestStep> steps = new ArrayList<>();
+
     public void setTestSuite(TestSuite suite) {
         this.testSuite = suite;
         if (suite != null) {
@@ -56,8 +59,6 @@ public class TestCase {
         this.title = other.title;
         this.preconditions = other.preconditions;
         this.description = other.description;
-        this.steps = other.steps;
-        this.expectedResult = other.expectedResult;
         this.priority = other.priority;
         this.tags = other.tags;
         this.state = other.state;
@@ -67,17 +68,15 @@ public class TestCase {
         this.component = other.component;
         this.useCase = other.useCase;
         this.requirement = other.requirement;
-        // Додай це, якщо копіюєш між проектами!
         this.projectId = other.projectId;
+        // НЕ копіюємо steps тут, це окремо!
     }
 
     public void applyFieldOperation(String fieldName, Object operationDto) {
-        // Implement field-level operations here (e.g., switch on fieldName)
         switch(fieldName) {
             case "priority":
                 this.priority = operationDto.toString();
                 break;
-            // add cases for other fields
             default:
                 throw new IllegalArgumentException("Unknown field: " + fieldName);
         }
