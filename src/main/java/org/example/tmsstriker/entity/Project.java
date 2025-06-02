@@ -1,4 +1,3 @@
-// Project.java
 package org.example.tmsstriker.entity;
 
 import jakarta.persistence.Column;
@@ -21,5 +20,4 @@ public class Project {
 
     @Column(nullable = false, unique = true, length = 32)
     private String code; // PR-1, DEMO-1, AUT-15
-
 }

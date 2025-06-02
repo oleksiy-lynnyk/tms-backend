@@ -13,6 +13,9 @@ public class TestCase {
     @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
+    @Column(nullable = false, unique = true, length = 32)
+    private String code;
+
     private String title;
     private String preconditions;
     private String description;

@@ -1,7 +1,4 @@
-// TestCaseService.java
 package org.example.tmsstriker.service;
-import org.springframework.http.HttpStatus;
-
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -10,40 +7,45 @@ import org.example.tmsstriker.dto.ImportResultDto;
 import org.example.tmsstriker.dto.TestCaseDTO;
 import org.example.tmsstriker.entity.TestCase;
 import org.example.tmsstriker.entity.TestSuite;
+import org.example.tmsstriker.entity.ProjectCaseSequence;
+import org.example.tmsstriker.exception.ApiException;
 import org.example.tmsstriker.repository.TestCaseRepository;
 import org.example.tmsstriker.repository.TestSuiteRepository;
+import org.example.tmsstriker.repository.ProjectCaseSequenceRepository;
 import org.example.tmsstriker.service.spec.TestCaseSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.example.tmsstriker.exception.ApiException;
-
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TestCaseService {
     private final TestCaseRepository repo;
     private final TestSuiteRepository suiteRepo;
+    private final ProjectCaseSequenceRepository sequenceRepo;
 
-
+    public TestCaseService(
+            TestCaseRepository repo,
+            TestSuiteRepository suiteRepo,
+            ProjectCaseSequenceRepository sequenceRepo
+    ) {
+        this.repo = repo;
+        this.suiteRepo = suiteRepo;
+        this.sequenceRepo = sequenceRepo;
+    }
 
     public TestCaseDTO getById(UUID id) {
         return repo.findById(id)
                 .map(this::toDto)
                 .orElseThrow(() -> new ApiException("TestCase not found: " + id, HttpStatus.NOT_FOUND));
-    }
-
-    public TestCaseService(TestCaseRepository repo,
-                           TestSuiteRepository suiteRepo) {
-        this.repo = repo;
-        this.suiteRepo = suiteRepo;
     }
 
     public Page<TestCaseDTO> getCases(UUID suiteId, String search, Pageable pg) {
@@ -57,9 +59,31 @@ public class TestCaseService {
     @Transactional
     public TestCaseDTO createTestCase(TestCaseDTO dto) {
         TestCase e = toEntity(dto);
+
+        if (dto.getSuiteId() == null) {
+            throw new ApiException("Suite is required", HttpStatus.BAD_REQUEST);
+        }
+
+        // --- CODE GEN START ---
         if (dto.getSuiteId() != null) {
             suiteRepo.findById(dto.getSuiteId()).ifPresent(e::setTestSuite);
         }
+        // Генеруємо code тільки для нових кейсів, якщо він не вказаний
+        if (e.getCode() == null || e.getCode().isEmpty()) {
+            UUID projectId = dto.getProjectId() != null
+                    ? dto.getProjectId()
+                    : (e.getTestSuite() != null && e.getTestSuite().getProjectId() != null)
+                    ? e.getTestSuite().getProjectId()
+                    : null;
+            if (projectId == null) {
+                throw new ApiException("Project ID required for code generation", HttpStatus.BAD_REQUEST);
+            }
+            int nextNum = getNextCaseNumberAtomic(projectId);
+            String code = "TC-" + nextNum;
+            e.setCode(code);
+        }
+        // --- CODE GEN END ---
+
         return toDto(repo.save(e));
     }
 
@@ -81,6 +105,10 @@ public class TestCaseService {
         e.setComponent(dto.getComponent());
         e.setUseCase(dto.getUseCase());
         e.setRequirement(dto.getRequirement());
+        // --- CODE GEN: Дозволяємо редагувати code (НЕ рекомендується міняти через фронт)
+        if (dto.getCode() != null) {
+            e.setCode(dto.getCode());
+        }
         if (dto.getSuiteId() != null) {
             suiteRepo.findById(dto.getSuiteId()).ifPresent(e::setTestSuite);
         } else {
@@ -117,12 +145,17 @@ public class TestCaseService {
         if (req.getCopyToSuiteId() != null) {
             var dest = suiteRepo.findById(req.getCopyToSuiteId()).orElse(null);
             if (dest != null) {
-                cases.forEach(orig -> {
+                UUID projectId = dest.getProjectId();
+                for (TestCase orig : cases) {
                     TestCase cp = new TestCase();
                     cp.copyFieldsFrom(orig);
                     cp.setTestSuite(dest);
+                    // --- CODE GEN: Унікальний code через sequence
+                    int nextNum = getNextCaseNumberAtomic(projectId);
+                    String code = "TC-" + nextNum;
+                    cp.setCode(code);
                     repo.save(cp);
-                });
+                }
             }
         }
 
@@ -160,6 +193,14 @@ public class TestCaseService {
                 tc.setComponent(rec.get("component"));
                 tc.setUseCase(rec.get("useCase"));
                 tc.setRequirement(rec.get("requirement"));
+
+                // --- CODE GEN при імпорті ---
+                UUID projectId = tc.getTestSuite().getProjectId();
+                int nextNum = getNextCaseNumberAtomic(projectId);
+                String code = "TC-" + nextNum;
+                tc.setCode(code);
+                // --- END ---
+
                 repo.save(tc);
                 result.incrementCreated();
             } catch (Exception ex) {
@@ -170,9 +211,26 @@ public class TestCaseService {
         return result;
     }
 
+    // --- Новий атомарний генератор номера для code (унікальний в рамках проекту) ---
+    @Transactional
+    protected int getNextCaseNumberAtomic(UUID projectId) {
+        ProjectCaseSequence seq = sequenceRepo.findById(projectId)
+                .orElseGet(() -> {
+                    ProjectCaseSequence s = new ProjectCaseSequence();
+                    s.setProjectId(projectId);
+                    s.setNextValue(1);
+                    return s;
+                });
+        int current = seq.getNextValue();
+        seq.setNextValue(current + 1);
+        sequenceRepo.save(seq);
+        return current;
+    }
+
     private TestCaseDTO toDto(TestCase e) {
         TestCaseDTO dto = new TestCaseDTO();
         dto.setId(e.getId());
+        dto.setCode(e.getCode()); // --- CODE GEN: додати у DTO
         dto.setTitle(e.getTitle());
         dto.setPreconditions(e.getPreconditions());
         dto.setDescription(e.getDescription());
@@ -188,12 +246,19 @@ public class TestCaseService {
         dto.setUseCase(e.getUseCase());
         dto.setRequirement(e.getRequirement());
         dto.setSuiteId(e.getTestSuite() != null ? e.getTestSuite().getId() : null);
+        // Якщо потрібно, додай ProjectId у DTO
+        dto.setProjectId(
+                e.getTestSuite() != null && e.getTestSuite().getProjectId() != null
+                        ? e.getTestSuite().getProjectId()
+                        : null
+        );
         return dto;
     }
 
     private TestCase toEntity(TestCaseDTO dto) {
         TestCase e = new TestCase();
         if (dto.getId() != null) e.setId(dto.getId());
+        if (dto.getCode() != null) e.setCode(dto.getCode());
         e.setTitle(dto.getTitle());
         e.setPreconditions(dto.getPreconditions());
         e.setDescription(dto.getDescription());

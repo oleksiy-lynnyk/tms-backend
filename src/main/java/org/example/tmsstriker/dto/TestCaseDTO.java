@@ -25,4 +25,5 @@ public class TestCaseDTO {
     /** Посилання на suite та project */
     private UUID suiteId;
     private UUID projectId;
+    private String code;
 }
