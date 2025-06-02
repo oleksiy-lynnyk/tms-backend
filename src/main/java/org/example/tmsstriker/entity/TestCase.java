@@ -1,12 +1,14 @@
-// TestCase.java
 package org.example.tmsstriker.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 import java.util.UUID;
 
 @Entity
 @Data
+@EqualsAndHashCode(callSuper = false)
 public class TestCase {
     @Id
     @GeneratedValue
@@ -35,6 +37,20 @@ public class TestCase {
     @JoinColumn(name = "suite_id", columnDefinition = "uuid")
     private TestSuite testSuite;
 
+    // === ДОДАНО: projectId ===
+    @Column(name = "project_id", columnDefinition = "uuid", nullable = false)
+    private UUID projectId;
+
+    // Переоприділи сеттер для suite — встановлює projectId
+    public void setTestSuite(TestSuite suite) {
+        this.testSuite = suite;
+        if (suite != null) {
+            this.projectId = suite.getProjectId();
+        } else {
+            this.projectId = null;
+        }
+    }
+
     // Utility methods for bulk operations:
     public void copyFieldsFrom(TestCase other) {
         this.title = other.title;
@@ -51,6 +67,8 @@ public class TestCase {
         this.component = other.component;
         this.useCase = other.useCase;
         this.requirement = other.requirement;
+        // Додай це, якщо копіюєш між проектами!
+        this.projectId = other.projectId;
     }
 
     public void applyFieldOperation(String fieldName, Object operationDto) {

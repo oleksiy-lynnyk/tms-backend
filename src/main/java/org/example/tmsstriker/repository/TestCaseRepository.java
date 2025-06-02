@@ -13,12 +13,14 @@ import java.util.UUID;
 public interface TestCaseRepository extends JpaRepository<TestCase, UUID>, JpaSpecificationExecutor<TestCase> {
     List<TestCase> findByTestSuite_Id(UUID suiteId);
 
-    // ТІЛЬКИ ОЦЕ ДОДАЄШ ↓↓↓
     @Query("SELECT COUNT(tc) FROM TestCase tc WHERE tc.testSuite.projectId = :projectId")
     int countByProjectId(@Param("projectId") UUID projectId);
 
     @Query("SELECT MAX(CAST(SUBSTRING(tc.code, 4) AS int)) FROM TestCase tc WHERE tc.testSuite.projectId = :projectId")
     Integer findMaxCodeNumberByProject(@Param("projectId") UUID projectId);
 
+    @Query("SELECT MAX(CAST(SUBSTRING(tc.code, 4) AS int)) FROM TestCase tc WHERE tc.projectId = :projectId")
+    Integer findMaxCodeNumber(@Param("projectId") UUID projectId);
 }
+
 

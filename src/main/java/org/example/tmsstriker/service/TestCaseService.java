@@ -18,7 +18,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -63,11 +65,8 @@ public class TestCaseService {
         if (dto.getSuiteId() == null) {
             throw new ApiException("Suite is required", HttpStatus.BAD_REQUEST);
         }
+        suiteRepo.findById(dto.getSuiteId()).ifPresent(e::setTestSuite);
 
-        // --- CODE GEN START ---
-        if (dto.getSuiteId() != null) {
-            suiteRepo.findById(dto.getSuiteId()).ifPresent(e::setTestSuite);
-        }
         // Генеруємо code тільки для нових кейсів, якщо він не вказаний
         if (e.getCode() == null || e.getCode().isEmpty()) {
             UUID projectId = dto.getProjectId() != null
@@ -82,8 +81,6 @@ public class TestCaseService {
             String code = "TC-" + nextNum;
             e.setCode(code);
         }
-        // --- CODE GEN END ---
-
         return toDto(repo.save(e));
     }
 
@@ -105,7 +102,7 @@ public class TestCaseService {
         e.setComponent(dto.getComponent());
         e.setUseCase(dto.getUseCase());
         e.setRequirement(dto.getRequirement());
-        // --- CODE GEN: Дозволяємо редагувати code (НЕ рекомендується міняти через фронт)
+        // Дозволяємо редагувати code (НЕ рекомендується міняти через фронт)
         if (dto.getCode() != null) {
             e.setCode(dto.getCode());
         }
@@ -150,7 +147,7 @@ public class TestCaseService {
                     TestCase cp = new TestCase();
                     cp.copyFieldsFrom(orig);
                     cp.setTestSuite(dest);
-                    // --- CODE GEN: Унікальний code через sequence
+                    cp.setProjectId(projectId);
                     int nextNum = getNextCaseNumberAtomic(projectId);
                     String code = "TC-" + nextNum;
                     cp.setCode(code);
@@ -194,12 +191,10 @@ public class TestCaseService {
                 tc.setUseCase(rec.get("useCase"));
                 tc.setRequirement(rec.get("requirement"));
 
-                // --- CODE GEN при імпорті ---
                 UUID projectId = tc.getTestSuite().getProjectId();
                 int nextNum = getNextCaseNumberAtomic(projectId);
                 String code = "TC-" + nextNum;
                 tc.setCode(code);
-                // --- END ---
 
                 repo.save(tc);
                 result.incrementCreated();
@@ -211,14 +206,15 @@ public class TestCaseService {
         return result;
     }
 
-    // --- Новий атомарний генератор номера для code (унікальний в рамках проекту) ---
+    // --- Атомарний генератор номера для code (унікальний в рамках проекту) ---
     @Transactional
     protected int getNextCaseNumberAtomic(UUID projectId) {
-        ProjectCaseSequence seq = sequenceRepo.findById(projectId)
+        ProjectCaseSequence seq = sequenceRepo.findByProjectIdForUpdate(projectId)
                 .orElseGet(() -> {
                     ProjectCaseSequence s = new ProjectCaseSequence();
                     s.setProjectId(projectId);
-                    s.setNextValue(1);
+                    Integer maxNum = repo.findMaxCodeNumberByProject(projectId);
+                    s.setNextValue(maxNum != null ? maxNum + 1 : 1);
                     return s;
                 });
         int current = seq.getNextValue();
@@ -230,7 +226,7 @@ public class TestCaseService {
     private TestCaseDTO toDto(TestCase e) {
         TestCaseDTO dto = new TestCaseDTO();
         dto.setId(e.getId());
-        dto.setCode(e.getCode()); // --- CODE GEN: додати у DTO
+        dto.setCode(e.getCode());
         dto.setTitle(e.getTitle());
         dto.setPreconditions(e.getPreconditions());
         dto.setDescription(e.getDescription());
@@ -246,7 +242,6 @@ public class TestCaseService {
         dto.setUseCase(e.getUseCase());
         dto.setRequirement(e.getRequirement());
         dto.setSuiteId(e.getTestSuite() != null ? e.getTestSuite().getId() : null);
-        // Якщо потрібно, додай ProjectId у DTO
         dto.setProjectId(
                 e.getTestSuite() != null && e.getTestSuite().getProjectId() != null
                         ? e.getTestSuite().getProjectId()
@@ -273,6 +268,8 @@ public class TestCaseService {
         e.setComponent(dto.getComponent());
         e.setUseCase(dto.getUseCase());
         e.setRequirement(dto.getRequirement());
+        if (dto.getProjectId() != null) e.setProjectId(dto.getProjectId());
         return e;
     }
+
 }
