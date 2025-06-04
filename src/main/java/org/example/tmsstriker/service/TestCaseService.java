@@ -5,7 +5,9 @@ import org.apache.commons.csv.CSVParser;
 import org.example.tmsstriker.dto.BulkTestCaseRequestDTO;
 import org.example.tmsstriker.dto.ImportResultDto;
 import org.example.tmsstriker.dto.TestCaseDTO;
+import org.example.tmsstriker.dto.TestStepDTO;
 import org.example.tmsstriker.entity.TestCase;
+import org.example.tmsstriker.entity.TestStep;
 import org.example.tmsstriker.entity.TestSuite;
 import org.example.tmsstriker.entity.ProjectCaseSequence;
 import org.example.tmsstriker.exception.ApiException;
@@ -18,12 +20,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -81,6 +82,16 @@ public class TestCaseService {
             String code = "TC-" + nextNum;
             e.setCode(code);
         }
+
+        // Додаємо кроки для нового кейсу
+        if (dto.getSteps() != null) {
+            for (int i = 0; i < dto.getSteps().size(); i++) {
+                TestStepDTO stepDto = dto.getSteps().get(i);
+                TestStep step = toTestStepEntity(stepDto);
+                step.setOrderIndex(stepDto.getOrderIndex() != null ? stepDto.getOrderIndex() : i);
+                e.addStep(step); // гарантія коректного parent/id
+            }
+        }
         return toDto(repo.save(e));
     }
 
@@ -91,8 +102,7 @@ public class TestCaseService {
         e.setTitle(dto.getTitle());
         e.setPreconditions(dto.getPreconditions());
         e.setDescription(dto.getDescription());
-        e.setSteps(dto.getSteps());
-        e.setExpectedResult(dto.getExpectedResult());
+        updateSteps(e, dto.getSteps());
         e.setPriority(dto.getPriority());
         e.setTags(dto.getTags());
         e.setState(dto.getState());
@@ -112,6 +122,37 @@ public class TestCaseService {
             e.setTestSuite(null);
         }
         return toDto(repo.save(e));
+    }
+
+    /** Головний метод для коректного оновлення списку кроків (steps) */
+    private void updateSteps(TestCase entity, List<TestStepDTO> newSteps) {
+        List<TestStep> existing = entity.getSteps();
+        // 1. Видалити ті, що були, але їх нема в новому списку
+        existing.removeIf(oldStep ->
+                newSteps == null ||
+                        newSteps.stream().noneMatch(dto -> dto.getId() != null && dto.getId().equals(oldStep.getId()))
+        );
+        // 2. Додати/оновити кроки з newSteps
+        if (newSteps != null) {
+            for (int i = 0; i < newSteps.size(); i++) {
+                TestStepDTO stepDto = newSteps.get(i);
+                TestStep step = null;
+                if (stepDto.getId() != null) {
+                    step = existing.stream()
+                            .filter(s -> s.getId() != null && s.getId().equals(stepDto.getId()))
+                            .findFirst()
+                            .orElse(null);
+                }
+                if (step == null) {
+                    step = new TestStep();
+                    step.setTestCase(entity);
+                    existing.add(step);
+                }
+                step.setOrderIndex(stepDto.getOrderIndex() != null ? stepDto.getOrderIndex() : i);
+                step.setAction(stepDto.getAction());
+                step.setExpectedResult(stepDto.getExpectedResult());
+            }
+        }
     }
 
     @Transactional
@@ -149,8 +190,18 @@ public class TestCaseService {
                     cp.setTestSuite(dest);
                     cp.setProjectId(projectId);
                     int nextNum = getNextCaseNumberAtomic(projectId);
-                    String code = "TC-" + nextNum;
-                    cp.setCode(code);
+                    cp.setCode("TC-" + nextNum);
+
+                    // Гарантуємо що id та parent виставлені коректно:
+                    if (orig.getSteps() != null) {
+                        for (TestStep step : orig.getSteps()) {
+                            TestStep stepCopy = new TestStep();
+                            stepCopy.setAction(step.getAction());
+                            stepCopy.setExpectedResult(step.getExpectedResult());
+                            stepCopy.setOrderIndex(step.getOrderIndex());
+                            cp.addStep(stepCopy); // id буде null і буде проставлено parent!
+                        }
+                    }
                     repo.save(cp);
                 }
             }
@@ -179,8 +230,9 @@ public class TestCaseService {
                 tc.setTitle(rec.get("title"));
                 tc.setPreconditions(rec.get("preconditions"));
                 tc.setDescription(rec.get("description"));
-                tc.setSteps(rec.get("steps"));
-                tc.setExpectedResult(rec.get("expectedResult"));
+                // ! Кроки потрібно парсити окремо (JSON, роздільник — як домовлено)
+                // tc.setSteps(rec.get("steps"));
+                // expectedResult -- ігноруємо (тільки на рівні кроку)
                 tc.setPriority(rec.get("priority"));
                 tc.setTags(rec.get("tags"));
                 tc.setState(rec.get("state"));
@@ -230,8 +282,11 @@ public class TestCaseService {
         dto.setTitle(e.getTitle());
         dto.setPreconditions(e.getPreconditions());
         dto.setDescription(e.getDescription());
-        dto.setSteps(e.getSteps());
-        dto.setExpectedResult(e.getExpectedResult());
+        dto.setSteps(e.getSteps() == null ? null :
+                e.getSteps().stream()
+                        .map(this::toTestStepDTO)
+                        .collect(Collectors.toList())
+        );
         dto.setPriority(e.getPriority());
         dto.setTags(e.getTags());
         dto.setState(e.getState());
@@ -257,8 +312,6 @@ public class TestCaseService {
         e.setTitle(dto.getTitle());
         e.setPreconditions(dto.getPreconditions());
         e.setDescription(dto.getDescription());
-        e.setSteps(dto.getSteps());
-        e.setExpectedResult(dto.getExpectedResult());
         e.setPriority(dto.getPriority());
         e.setTags(dto.getTags());
         e.setState(dto.getState());
@@ -269,7 +322,35 @@ public class TestCaseService {
         e.setUseCase(dto.getUseCase());
         e.setRequirement(dto.getRequirement());
         if (dto.getProjectId() != null) e.setProjectId(dto.getProjectId());
+        // Додаємо кроки (для create)
+        if (dto.getSteps() != null) {
+            List<TestStep> steps = dto.getSteps().stream()
+                    .map(this::toTestStepEntity)
+                    .collect(Collectors.toList());
+            for (TestStep s : steps) {
+                e.addStep(s); // гарантія null id та parent
+            }
+        }
         return e;
     }
 
+    // --- Маппери для кроків ---
+    private TestStep toTestStepEntity(TestStepDTO dto) {
+        TestStep step = new TestStep();
+        // id не ставимо взагалі для нових, лише для update
+        step.setId(dto.getId());
+        step.setOrderIndex(dto.getOrderIndex());
+        step.setAction(dto.getAction());
+        step.setExpectedResult(dto.getExpectedResult());
+        return step;
+    }
+
+    private TestStepDTO toTestStepDTO(TestStep step) {
+        TestStepDTO dto = new TestStepDTO();
+        dto.setId(step.getId());
+        dto.setOrderIndex(step.getOrderIndex());
+        dto.setAction(step.getAction());
+        dto.setExpectedResult(step.getExpectedResult());
+        return dto;
+    }
 }

@@ -81,4 +81,21 @@ public class TestCase {
                 throw new IllegalArgumentException("Unknown field: " + fieldName);
         }
     }
+
+    public void addStep(TestStep step) {
+        if (step != null) {
+            step.setId(null);            // <-- гарантуємо завжди новий крок!
+            step.setTestCase(this);      // Прив'язуємо до цього TestCase
+            this.steps.add(step);
+        }
+    }
+
+
+    public void removeStep(TestStep step) {
+        this.steps.remove(step);
+        step.setTestCase(null);
+    }
+
+
+
 }
