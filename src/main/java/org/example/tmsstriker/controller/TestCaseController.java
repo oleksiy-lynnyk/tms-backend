@@ -71,4 +71,14 @@ public class TestCaseController {
         ImportResultDto result = service.importFromCsv(suiteId, file.getInputStream());
         return ResponseEntity.ok(result);
     }
+    @GetMapping
+    public ResponseEntity<Page<TestCaseDTO>> getCases(
+            @RequestParam("suiteId") UUID suiteId,
+            @RequestParam(value = "search", required = false) String search,
+            Pageable pageable
+    ) {
+        Page<TestCaseDTO> page = service.getCases(suiteId, search, pageable);
+        return ResponseEntity.ok(page);
+    }
+
 }
