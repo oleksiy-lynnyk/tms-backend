@@ -10,8 +10,13 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.UUID;
 
+
+
 public interface TestCaseRepository extends JpaRepository<TestCase, UUID>, JpaSpecificationExecutor<TestCase> {
     List<TestCase> findByTestSuite_Id(UUID suiteId);
+
+    // ДОДАЙ ОЦЕ:
+    int countByTestSuite_Id(UUID suiteId);
 
     @Query("SELECT COUNT(tc) FROM TestCase tc WHERE tc.testSuite.projectId = :projectId")
     int countByProjectId(@Param("projectId") UUID projectId);
