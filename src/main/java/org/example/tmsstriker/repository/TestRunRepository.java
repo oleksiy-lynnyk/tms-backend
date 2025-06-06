@@ -8,5 +8,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface TestRunRepository extends JpaRepository<TestRun, UUID> {
+
     Page<TestRun> findByProjectId(UUID projectId, Pageable pageable);
+
+    long countByProjectId(UUID projectId);
+
 }

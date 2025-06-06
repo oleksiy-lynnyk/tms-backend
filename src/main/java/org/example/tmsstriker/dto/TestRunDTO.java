@@ -10,8 +10,11 @@ import java.time.Instant;
 public class TestRunDTO {
     private UUID id;
     private UUID projectId;
+    private String code;
     private String name;
+    private String description;
     private String status;
     private Instant startedAt;
     private Instant completedAt;
+    private UserShortDTO assignedTo; // <--- Додаємо це поле
 }
