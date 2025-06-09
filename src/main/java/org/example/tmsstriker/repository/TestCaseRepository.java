@@ -26,6 +26,11 @@ public interface TestCaseRepository extends JpaRepository<TestCase, UUID>, JpaSp
 
     @Query("SELECT MAX(CAST(SUBSTRING(tc.code, 4) AS int)) FROM TestCase tc WHERE tc.projectId = :projectId")
     Integer findMaxCodeNumber(@Param("projectId") UUID projectId);
+
+    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(tc.code, 4) AS int)), 0) " +
+            "FROM TestCase tc WHERE tc.projectId = :projectId AND tc.code LIKE 'TC-%'")
+    int findMaxCodeNumberForProject(@Param("projectId") UUID projectId);
+
 }
 
 

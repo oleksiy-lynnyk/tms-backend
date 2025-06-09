@@ -1,19 +1,24 @@
 // ProjectDTO.java
 package org.example.tmsstriker.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 import java.util.UUID;
 
 @Data
-@EqualsAndHashCode(callSuper = false)
-public class ProjectDTO extends BaseDTO<UUID> {
+public class ProjectDTO {
+
+    private UUID id;
+
     private String name;
+
     private String description;
+
+    @Schema(accessMode = Schema.AccessMode.READ_ONLY)
     private String code;
-    private int testCaseCount;
 
-
+    private int testCasesCount;
 }
+
 

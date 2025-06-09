@@ -1,0 +1,17 @@
+# Автоматичне виявлення текстових файлів
+* text=auto
+
+# Примусове використання LF (Unix-style) для конкретних типів файлів
+*.java text eol=lf
+*.xml text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.properties text eol=lf
+*.gradle text eol=lf
+
+# Додатково — щоб уникнути проблем зі скриптами
+*.bat text eol=crlf
+*.cmd text eol=crlf

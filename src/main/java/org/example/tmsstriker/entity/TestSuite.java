@@ -1,28 +1,48 @@
 package org.example.tmsstriker.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
 import java.util.UUID;
-import java.util.List;
 
 @Entity
-@Data
+@Table(name = "test_suite", uniqueConstraints = @UniqueConstraint(columnNames = {"project_id", "code"}))
+
 public class TestSuite {
+
     @Id
     @GeneratedValue
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
-    private String name;
-    private String description;
-
-    // projectId — просте поле UUID (НЕ ManyToOne)
-    @Column(name = "project_id", columnDefinition = "uuid", nullable = false)
+    @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
-    @Column(name = "parent_id", columnDefinition = "uuid")
+    @Column(name = "parent_id")
     private UUID parentId;
 
-    @Transient
-    private List<TestSuite> children;
+    @Column(name = "name")
+    private String name;
+
+    @Column(name = "description")
+    private String description;
+
+    @Column(name = "code")
+    private String code;
+
+    // --- Геттери і сеттери ---
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public UUID getProjectId() { return projectId; }
+    public void setProjectId(UUID projectId) { this.projectId = projectId; }
+
+    public UUID getParentId() { return parentId; }
+    public void setParentId(UUID parentId) { this.parentId = parentId; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
 }

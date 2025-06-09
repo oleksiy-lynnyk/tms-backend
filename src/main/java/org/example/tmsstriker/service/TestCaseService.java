@@ -8,12 +8,9 @@ import org.example.tmsstriker.dto.TestCaseDTO;
 import org.example.tmsstriker.dto.TestStepDTO;
 import org.example.tmsstriker.entity.TestCase;
 import org.example.tmsstriker.entity.TestStep;
-import org.example.tmsstriker.entity.TestSuite;
-import org.example.tmsstriker.entity.ProjectCaseSequence;
 import org.example.tmsstriker.exception.ApiException;
 import org.example.tmsstriker.repository.TestCaseRepository;
 import org.example.tmsstriker.repository.TestSuiteRepository;
-import org.example.tmsstriker.repository.ProjectCaseSequenceRepository;
 import org.example.tmsstriker.service.spec.TestCaseSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,16 +30,16 @@ import java.util.stream.Collectors;
 public class TestCaseService {
     private final TestCaseRepository repo;
     private final TestSuiteRepository suiteRepo;
-    private final ProjectCaseSequenceRepository sequenceRepo;
+    private final CodeGeneratorService codeGeneratorService; // Додаємо універсальний сервіс
 
     public TestCaseService(
             TestCaseRepository repo,
             TestSuiteRepository suiteRepo,
-            ProjectCaseSequenceRepository sequenceRepo
+            CodeGeneratorService codeGeneratorService
     ) {
         this.repo = repo;
         this.suiteRepo = suiteRepo;
-        this.sequenceRepo = sequenceRepo;
+        this.codeGeneratorService = codeGeneratorService;
     }
 
     public TestCaseDTO getById(UUID id) {
@@ -68,28 +65,20 @@ public class TestCaseService {
         }
         suiteRepo.findById(dto.getSuiteId()).ifPresent(e::setTestSuite);
 
-        // Генеруємо code тільки для нових кейсів, якщо він не вказаний
+        // Генерація code для нового кейсу
         if (e.getCode() == null || e.getCode().isEmpty()) {
-            UUID projectId = dto.getProjectId() != null
-                    ? dto.getProjectId()
-                    : (e.getTestSuite() != null && e.getTestSuite().getProjectId() != null)
-                    ? e.getTestSuite().getProjectId()
-                    : null;
-            if (projectId == null) {
-                throw new ApiException("Project ID required for code generation", HttpStatus.BAD_REQUEST);
-            }
-            int nextNum = getNextCaseNumberAtomic(projectId);
-            String code = "TC-" + nextNum;
+            UUID projectId = getProjectId(dto, e);
+            String code = codeGeneratorService.generateNextCode("test_case", projectId, "TC-");
             e.setCode(code);
         }
 
-        // Додаємо кроки для нового кейсу
+        // Додаємо кроки
         if (dto.getSteps() != null) {
             for (int i = 0; i < dto.getSteps().size(); i++) {
                 TestStepDTO stepDto = dto.getSteps().get(i);
                 TestStep step = toTestStepEntity(stepDto);
                 step.setOrderIndex(stepDto.getOrderIndex() != null ? stepDto.getOrderIndex() : i);
-                e.addStep(step); // гарантія коректного parent/id
+                e.addStep(step);
             }
         }
         return toDto(repo.save(e));
@@ -112,7 +101,6 @@ public class TestCaseService {
         e.setComponent(dto.getComponent());
         e.setUseCase(dto.getUseCase());
         e.setRequirement(dto.getRequirement());
-        // Дозволяємо редагувати code (НЕ рекомендується міняти через фронт)
         if (dto.getCode() != null) {
             e.setCode(dto.getCode());
         }
@@ -124,15 +112,13 @@ public class TestCaseService {
         return toDto(repo.save(e));
     }
 
-    /** Головний метод для коректного оновлення списку кроків (steps) */
+    /** Оновлення списку кроків */
     private void updateSteps(TestCase entity, List<TestStepDTO> newSteps) {
         List<TestStep> existing = entity.getSteps();
-        // 1. Видалити ті, що були, але їх нема в новому списку
         existing.removeIf(oldStep ->
                 newSteps == null ||
                         newSteps.stream().noneMatch(dto -> dto.getId() != null && dto.getId().equals(oldStep.getId()))
         );
-        // 2. Додати/оновити кроки з newSteps
         if (newSteps != null) {
             for (int i = 0; i < newSteps.size(); i++) {
                 TestStepDTO stepDto = newSteps.get(i);
@@ -189,17 +175,16 @@ public class TestCaseService {
                     cp.copyFieldsFrom(orig);
                     cp.setTestSuite(dest);
                     cp.setProjectId(projectId);
-                    int nextNum = getNextCaseNumberAtomic(projectId);
-                    cp.setCode("TC-" + nextNum);
+                    String code = codeGeneratorService.generateNextCode("test_case", projectId, "TC-");
+                    cp.setCode(code);
 
-                    // Гарантуємо що id та parent виставлені коректно:
                     if (orig.getSteps() != null) {
                         for (TestStep step : orig.getSteps()) {
                             TestStep stepCopy = new TestStep();
                             stepCopy.setAction(step.getAction());
                             stepCopy.setExpectedResult(step.getExpectedResult());
                             stepCopy.setOrderIndex(step.getOrderIndex());
-                            cp.addStep(stepCopy); // id буде null і буде проставлено parent!
+                            cp.addStep(stepCopy);
                         }
                     }
                     repo.save(cp);
@@ -230,9 +215,6 @@ public class TestCaseService {
                 tc.setTitle(rec.get("title"));
                 tc.setPreconditions(rec.get("preconditions"));
                 tc.setDescription(rec.get("description"));
-                // ! Кроки потрібно парсити окремо (JSON, роздільник — як домовлено)
-                // tc.setSteps(rec.get("steps"));
-                // expectedResult -- ігноруємо (тільки на рівні кроку)
                 tc.setPriority(rec.get("priority"));
                 tc.setTags(rec.get("tags"));
                 tc.setState(rec.get("state"));
@@ -244,8 +226,7 @@ public class TestCaseService {
                 tc.setRequirement(rec.get("requirement"));
 
                 UUID projectId = tc.getTestSuite().getProjectId();
-                int nextNum = getNextCaseNumberAtomic(projectId);
-                String code = "TC-" + nextNum;
+                String code = codeGeneratorService.generateNextCode("test_case", projectId, "TC-");
                 tc.setCode(code);
 
                 repo.save(tc);
@@ -258,23 +239,15 @@ public class TestCaseService {
         return result;
     }
 
-    // --- Атомарний генератор номера для code (унікальний в рамках проекту) ---
-    @Transactional
-    protected int getNextCaseNumberAtomic(UUID projectId) {
-        ProjectCaseSequence seq = sequenceRepo.findByProjectIdForUpdate(projectId)
-                .orElseGet(() -> {
-                    ProjectCaseSequence s = new ProjectCaseSequence();
-                    s.setProjectId(projectId);
-                    Integer maxNum = repo.findMaxCodeNumberByProject(projectId);
-                    s.setNextValue(maxNum != null ? maxNum + 1 : 1);
-                    return s;
-                });
-        int current = seq.getNextValue();
-        seq.setNextValue(current + 1);
-        sequenceRepo.save(seq);
-        return current;
+    /** Хелпер для отримання projectId */
+    private UUID getProjectId(TestCaseDTO dto, TestCase entity) {
+        if (dto.getProjectId() != null) return dto.getProjectId();
+        if (entity.getTestSuite() != null && entity.getTestSuite().getProjectId() != null)
+            return entity.getTestSuite().getProjectId();
+        throw new ApiException("Project ID required for code generation", HttpStatus.BAD_REQUEST);
     }
 
+    // --- Маппери для кроків ---
     private TestCaseDTO toDto(TestCase e) {
         TestCaseDTO dto = new TestCaseDTO();
         dto.setId(e.getId());
@@ -322,22 +295,19 @@ public class TestCaseService {
         e.setUseCase(dto.getUseCase());
         e.setRequirement(dto.getRequirement());
         if (dto.getProjectId() != null) e.setProjectId(dto.getProjectId());
-        // Додаємо кроки (для create)
         if (dto.getSteps() != null) {
             List<TestStep> steps = dto.getSteps().stream()
                     .map(this::toTestStepEntity)
                     .collect(Collectors.toList());
             for (TestStep s : steps) {
-                e.addStep(s); // гарантія null id та parent
+                e.addStep(s);
             }
         }
         return e;
     }
 
-    // --- Маппери для кроків ---
     private TestStep toTestStepEntity(TestStepDTO dto) {
         TestStep step = new TestStep();
-        // id не ставимо взагалі для нових, лише для update
         step.setId(dto.getId());
         step.setOrderIndex(dto.getOrderIndex());
         step.setAction(dto.getAction());

@@ -13,13 +13,14 @@ import java.util.UUID;
 @RequestMapping("/api/projects")
 @CrossOrigin(origins = "http://localhost:3000")
 public class ProjectController {
+
     private final ProjectService service;
 
     public ProjectController(ProjectService service) {
         this.service = service;
     }
 
-    // --- Єдиний GET --- пагінація + пошук
+    // --- Пагінація + пошук ---
     @GetMapping
     public ResponseEntity<Page<ProjectDTO>> getPaged(
             @RequestParam(value = "search", required = false) String search,
@@ -57,9 +58,10 @@ public class ProjectController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- [Optional] Якщо дуже треба всіх (НЕ для великих списків) ---
+    // --- [Optional] Якщо треба всіх (НЕ для великих списків) ---
     // @GetMapping("/all")
     // public ResponseEntity<List<ProjectDTO>> getAll() {
     //     return ResponseEntity.ok(service.findAll());
     // }
 }
+

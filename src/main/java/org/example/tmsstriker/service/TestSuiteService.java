@@ -1,140 +1,129 @@
-// TestSuiteService.java
 package org.example.tmsstriker.service;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
+import lombok.RequiredArgsConstructor;
 import org.example.tmsstriker.dto.TestSuiteDTO;
 import org.example.tmsstriker.entity.TestSuite;
 import org.example.tmsstriker.exception.ApiException;
-import org.example.tmsstriker.repository.TestCaseRepository;
 import org.example.tmsstriker.repository.TestSuiteRepository;
-import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.*;
+import java.util.stream.Collectors;
+
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class TestSuiteService {
     private final TestSuiteRepository repo;
-    private final TestCaseRepository testCaseRepo;
-    private final ModelMapper mapper;
+    private final CodeGeneratorService codeGeneratorService;
 
-    public TestSuiteService(TestSuiteRepository repo, TestCaseRepository testCaseRepo, ModelMapper mapper) {
-        this.repo = repo;
-        this.testCaseRepo = testCaseRepo;
-        this.mapper = mapper;
+    // --- CRUD ---
+    public TestSuiteDTO getById(UUID id) {
+        return repo.findById(id)
+                .map(this::toDto)
+                .orElseThrow(() -> new ApiException("TestSuite not found: " + id, HttpStatus.NOT_FOUND));
     }
 
-    /** Плоский список усіх сьютів */
-    public List<TestSuiteDTO> getAllSuites() {
-        return repo.findAll().stream()
-                .map(e -> mapper.map(e, TestSuiteDTO.class))
+    public List<TestSuiteDTO> getSuitesByProject(UUID projectId) {
+        return repo.findByProjectId(projectId).stream()
+                .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    /** Один сьют за UUID */
-    public TestSuiteDTO getById(UUID id) {
-        return repo.findById(id)
-                .map(e -> mapper.map(e, TestSuiteDTO.class))
-                .orElseThrow(() -> new ApiException("Suite not found: " + id, HttpStatus.NOT_FOUND));
+    public Page<TestSuiteDTO> getSuitesPage(UUID projectId, Pageable pageable) {
+        return repo.findByProjectId(projectId, pageable)
+                .map(this::toDto);
     }
 
-    /** Створити новий сьют */
+    @Transactional
     public TestSuiteDTO createSuite(TestSuiteDTO dto) {
-        TestSuite e = mapper.map(dto, TestSuite.class);
-        TestSuite saved = repo.save(e);
-        return mapper.map(saved, TestSuiteDTO.class);
+        TestSuite suite = toEntity(dto);
+        if (suite.getCode() == null || suite.getCode().isEmpty()) {
+            String code = codeGeneratorService.generateNextCode("test_suite", suite.getProjectId(), "TS-");
+            suite.setCode(code);
+        }
+        TestSuite saved = repo.save(suite);
+        return toDto(saved);
     }
 
-    /** Оновити існуючий сьют */
+    @Transactional
     public TestSuiteDTO updateSuite(UUID id, TestSuiteDTO dto) {
-        TestSuite e = repo.findById(id)
-                .orElseThrow(() -> new ApiException("Suite not found: " + id, HttpStatus.NOT_FOUND));
-        e.setName(dto.getName());
-        e.setDescription(dto.getDescription());
-        e.setProjectId(dto.getProjectId());
-        e.setParentId(dto.getParentId());
-        TestSuite updated = repo.save(e);
-        return mapper.map(updated, TestSuiteDTO.class);
+        TestSuite suite = repo.findById(id)
+                .orElseThrow(() -> new ApiException("TestSuite not found: " + id, HttpStatus.NOT_FOUND));
+        suite.setName(dto.getName());
+        suite.setDescription(dto.getDescription());
+        if (dto.getCode() != null) {
+            suite.setCode(dto.getCode());
+        }
+        return toDto(repo.save(suite));
     }
 
-    /** Видалити сьют */
+    @Transactional
     public void deleteSuite(UUID id) {
         repo.deleteById(id);
     }
 
-    /**
-     * ДЕРЕВО сьютів по проекту (корені + всі нащадки)
-     */
+    // --- TREE / FLAT LOGIC ---
+
+    /** Дерево сьютів для одного проекту */
     public List<TestSuiteDTO> getSuitesTree(UUID projectId) {
-        // Плоский список усіх сьютів проєкту:
-        List<TestSuite> flat = repo.findByProjectId(projectId);
-
-        // Мапимо в DTO:
-        List<TestSuiteDTO> flatDtos = flat.stream()
-                .map(e -> mapper.map(e, TestSuiteDTO.class))
+        List<TestSuite> all = repo.findByProjectId(projectId);
+        // шукаємо тільки root-елементи (parentId == null)
+        List<TestSuite> roots = all.stream()
+                .filter(s -> s.getParentId() == null)
                 .collect(Collectors.toList());
-
-        // Будуємо дерево:
-        List<TestSuiteDTO> tree = buildTree(flatDtos);
-
-        // Підрахунок кейсів:
-        fillTestCaseCounts(tree);
-
-        return tree;
+        return roots.stream().map(r -> toDtoWithChildren(r, all)).collect(Collectors.toList());
     }
 
-    /** Побудова дерева з плоского списку */
-    private List<TestSuiteDTO> buildTree(List<TestSuiteDTO> flat) {
-        Map<UUID, TestSuiteDTO> byId = new HashMap<>();
-        List<TestSuiteDTO> roots = new ArrayList<>();
-
-        for (TestSuiteDTO suite : flat) {
-            byId.put(suite.getId(), suite);
-            suite.setChildren(new ArrayList<>()); // children завжди не null
-        }
-
-        for (TestSuiteDTO suite : flat) {
-            UUID parentId = suite.getParentId();
-            if (parentId != null && byId.containsKey(parentId)) {
-                byId.get(parentId).getChildren().add(suite);
-            } else {
-                roots.add(suite);
-            }
-        }
-        return roots;
-    }
-
-    /** Рекурсивно рахує testCaseCount для всіх сьютів (children не null!) */
-    private void fillTestCaseCounts(List<TestSuiteDTO> suites) {
-        if (suites == null) return;
-        for (TestSuiteDTO suite : suites) {
-            // 1. Кількість кейсів напряму в цьому сьюті (з БД)
-            int count = testCaseRepo.countByTestSuite_Id(suite.getId());
-
-            // 2. Рекурсивно додаємо кількість кейсів у дочірніх сьютах
-            if (suite.getChildren() != null && !suite.getChildren().isEmpty()) {
-                fillTestCaseCounts(suite.getChildren());
-                for (TestSuiteDTO child : suite.getChildren()) {
-                    count += child.getTestCaseCount();
-                }
-            }
-
-            // 3. Встановлюємо фінальне значення
-            suite.setTestCaseCount(count);
-        }
-    }
-
-
-    /** Опціонально: дерево усіх сьютів */
+    /** Дерево всіх сьютів (по всіх проектах) */
     public List<TestSuiteDTO> getAllSuitesAsTree() {
         List<TestSuite> all = repo.findAll();
-        List<TestSuiteDTO> dtos = all.stream()
-                .map(e -> mapper.map(e, TestSuiteDTO.class))
+        List<TestSuite> roots = all.stream()
+                .filter(s -> s.getParentId() == null)
                 .collect(Collectors.toList());
-        return buildTree(dtos);
+        return roots.stream().map(r -> toDtoWithChildren(r, all)).collect(Collectors.toList());
+    }
+
+    /** Плоский список всіх сьютів */
+    public List<TestSuiteDTO> getAllSuites() {
+        return repo.findAll().stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    // --- Маппери ---
+    private TestSuiteDTO toDtoWithChildren(TestSuite suite, List<TestSuite> all) {
+        TestSuiteDTO dto = toDto(suite);
+        List<TestSuiteDTO> children = all.stream()
+                .filter(s -> suite.getId().equals(s.getParentId()))
+                .map(s -> toDtoWithChildren(s, all))
+                .collect(Collectors.toList());
+        dto.setChildren(children);
+        return dto;
+    }
+
+    private TestSuiteDTO toDto(TestSuite s) {
+        TestSuiteDTO dto = new TestSuiteDTO();
+        dto.setId(s.getId());
+        dto.setProjectId(s.getProjectId());
+        dto.setParentId(s.getParentId());
+        dto.setName(s.getName());
+        dto.setDescription(s.getDescription());
+        dto.setCode(s.getCode());
+        // Дітей НЕ додаємо тут, тільки в toDtoWithChildren
+        return dto;
+    }
+
+    private TestSuite toEntity(TestSuiteDTO dto) {
+        TestSuite s = new TestSuite();
+        if (dto.getId() != null) s.setId(dto.getId());
+        s.setProjectId(dto.getProjectId());
+        s.setParentId(dto.getParentId());
+        s.setName(dto.getName());
+        s.setDescription(dto.getDescription());
+        s.setCode(dto.getCode());
+        return s;
     }
 }
-

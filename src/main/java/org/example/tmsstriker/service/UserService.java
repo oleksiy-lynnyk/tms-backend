@@ -5,6 +5,8 @@ import org.example.tmsstriker.dto.UserFullDTO;
 import org.example.tmsstriker.dto.UserShortDTO;
 import org.example.tmsstriker.entity.User;
 import org.example.tmsstriker.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +19,12 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+
+    /** Пагінація для фронта */
+    public Page<UserFullDTO> findAllPaged(Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(this::toFullDto);
+    }
 
     public List<UserShortDTO> findAllShort() {
         return userRepository.findAll().stream()
@@ -61,15 +69,15 @@ public class UserService {
         userRepository.deleteById(id);
     }
 
-    // Маппери
-    private UserShortDTO toShortDto(User user) {
+    // --- Маппери ---
+    public UserShortDTO toShortDto(User user) {
         UserShortDTO dto = new UserShortDTO();
         dto.setId(user.getId());
         dto.setName(user.getName());
         return dto;
     }
 
-    private UserFullDTO toFullDto(User user) {
+    public UserFullDTO toFullDto(User user) {
         UserFullDTO dto = new UserFullDTO();
         dto.setId(user.getId());
         dto.setName(user.getName());
@@ -77,4 +85,12 @@ public class UserService {
         dto.setRole(user.getRole());
         return dto;
     }
+
+    public List<UserShortDTO> getAllShort() {
+        return userRepository.findAll().stream()
+                .map(user -> new UserShortDTO(user.getId(), user.getName()))
+                .collect(Collectors.toList());
+    }
+
 }
+

@@ -1,4 +1,3 @@
-// TestRun.java
 package org.example.tmsstriker.entity;
 
 import jakarta.persistence.*;
@@ -7,28 +6,36 @@ import lombok.Data;
 import java.time.Instant;
 import java.util.UUID;
 
-// src/main/java/org/example/tmsstriker/entity/TestRun.java
-
 @Entity
-@Table(name = "test_runs")
+@Table(name = "test_run")
 @Data
 public class TestRun {
+
     @Id
+    @GeneratedValue
     private UUID id;
 
     @Column(nullable = false)
     private UUID projectId;
 
-    @Column(unique = true, nullable = false)
-    private String code; // ← ДОДАНО!
-
+    @Column
     private String name;
+
+    @Column
     private String description;
+
+    @Column
+    private String code;
+
+    @Column
     private String status;
+
+    @Column
     private Instant startedAt;
+
+    @Column
     private Instant completedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_to_id")
-    private User assignedTo;
+    @Column
+    private UUID assignedTo;
 }
