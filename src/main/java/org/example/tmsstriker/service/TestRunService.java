@@ -3,108 +3,156 @@ package org.example.tmsstriker.service;
 import lombok.RequiredArgsConstructor;
 import org.example.tmsstriker.dto.ExecutionCommandDTO;
 import org.example.tmsstriker.dto.TestRunDTO;
+import org.example.tmsstriker.entity.AppUser;
+import org.example.tmsstriker.entity.Configuration;
+import org.example.tmsstriker.entity.Environment;
+import org.example.tmsstriker.entity.Project;
+import org.example.tmsstriker.entity.TestCase;
 import org.example.tmsstriker.entity.TestRun;
+import org.example.tmsstriker.entity.Version;
 import org.example.tmsstriker.exception.ApiException;
-import org.example.tmsstriker.repository.TestRunRepository;
+import org.example.tmsstriker.mapper.TestRunMapper;
+import org.example.tmsstriker.repository.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class TestRunService {
 
-    private final TestRunRepository repo;
-    private final CodeGeneratorService codeGeneratorService;
+    private final TestRunRepository testRunRepository;
+    private final ProjectRepository projectRepository;
+    private final AppUserRepository appUserRepository;
+    private final EnvironmentRepository environmentRepository;
+    private final ConfigurationRepository configurationRepository;
+    private final VersionRepository versionRepository;
+    private final TestCaseRepository testCaseRepository;
+    private final TestRunMapper mapper;
 
-    public Page<TestRunDTO> getRunsByProject(UUID projectId, Pageable pageable) {
-        return repo.findByProjectId(projectId, pageable).map(this::toDto);
+    @Transactional(readOnly = true)
+    public Page<TestRunDTO> getByProject(UUID projectId, Pageable pageable) {
+        return testRunRepository.findByProject_Id(projectId, pageable)
+                .map(mapper::toDto);
     }
 
-    public TestRunDTO getById(UUID id) {
-        return repo.findById(id).map(this::toDto)
-                .orElseThrow(() -> new ApiException("Run not found: " + id, HttpStatus.NOT_FOUND));
-    }
-
-    public TestRunDTO createRun(TestRunDTO dto) {
+    @Transactional
+    public TestRunDTO create(TestRunDTO dto) {
         TestRun entity = new TestRun();
-        entity.setId(UUID.randomUUID());
-        entity.setProjectId(dto.getProjectId());
+        fillFields(entity, dto);
+        entity.setStartedAt(Instant.now());
+        TestRun saved = testRunRepository.save(entity);
+        return mapper.toDto(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public TestRunDTO getById(UUID id) {
+        TestRun entity = testRunRepository.findById(id)
+                .orElseThrow(() -> new ApiException("TestRun not found: " + id, HttpStatus.NOT_FOUND));
+        return mapper.toDto(entity);
+    }
+
+    @Transactional
+    public TestRunDTO update(UUID id, TestRunDTO dto) {
+        TestRun entity = testRunRepository.findById(id)
+                .orElseThrow(() -> new ApiException("TestRun not found: " + id, HttpStatus.NOT_FOUND));
+        fillFields(entity, dto);
+        TestRun updated = testRunRepository.save(entity);
+        return mapper.toDto(updated);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        testRunRepository.deleteById(id);
+    }
+
+    @Transactional
+    public TestRunDTO executeCommand(UUID id, ExecutionCommandDTO command) {
+        TestRun entity = testRunRepository.findById(id)
+                .orElseThrow(() -> new ApiException("TestRun not found: " + id, HttpStatus.NOT_FOUND));
+        // Тут логіка обробки команд, наразі просто апдейтимо статус та коментар
+        entity.setStatus(command.getCommand());
+        entity.setDescription(command.getComment());
+        TestRun updated = testRunRepository.save(entity);
+        return mapper.toDto(updated);
+    }
+
+    @Transactional
+    public void completeRun(UUID id) {
+        TestRun entity = testRunRepository.findById(id)
+                .orElseThrow(() -> new ApiException("TestRun not found: " + id, HttpStatus.NOT_FOUND));
+        entity.setCompletedAt(Instant.now());
+        entity.setStatus("Completed");
+        testRunRepository.save(entity);
+    }
+
+    @Transactional
+    public TestRunDTO cloneRun(UUID id) {
+        TestRun entity = testRunRepository.findById(id)
+                .orElseThrow(() -> new ApiException("TestRun not found: " + id, HttpStatus.NOT_FOUND));
+        TestRun copy = new TestRun();
+        copy.setProject(entity.getProject());
+        copy.setCode(entity.getCode() + "-CLONE");
+        copy.setName(entity.getName() + " (Clone)");
+        copy.setDescription(entity.getDescription());
+        copy.setStatus("Created");
+        copy.setStartedAt(Instant.now());
+        copy.setAssignedTo(entity.getAssignedTo());
+        copy.setVersion(entity.getVersion());
+        copy.setConfiguration(entity.getConfiguration());
+        copy.setEnvironments(entity.getEnvironments());
+        copy.setTestCases(entity.getTestCases());
+        TestRun cloned = testRunRepository.save(copy);
+        return mapper.toDto(cloned);
+    }
+
+    private void fillFields(TestRun entity, TestRunDTO dto) {
         entity.setName(dto.getName());
         entity.setDescription(dto.getDescription());
-        entity.setAssignedTo(dto.getAssignedTo());
-        entity.setStatus("DRAFT");
-        entity.setStartedAt(null);
-        entity.setCompletedAt(null);
-        entity.setCode(codeGeneratorService.generateNextCode("test_run", dto.getProjectId(), "R-"));
-        return toDto(repo.save(entity));
-    }
+        entity.setStatus(dto.getStatus());
 
-    public TestRunDTO updateRun(UUID id, TestRunDTO dto) {
-        TestRun run = repo.findById(id)
-                .orElseThrow(() -> new ApiException("Run not found: " + id, HttpStatus.NOT_FOUND));
-        run.setName(dto.getName());
-        run.setDescription(dto.getDescription());
-        run.setAssignedTo(dto.getAssignedTo());
-        run.setStatus(dto.getStatus());
-        return toDto(repo.save(run));
-    }
+        entity.setProject(projectRepository.findById(dto.getProjectId())
+                .orElseThrow(() -> new ApiException("Project not found: " + dto.getProjectId(), HttpStatus.BAD_REQUEST)));
 
-    public void deleteRun(UUID id) {
-        repo.deleteById(id);
-    }
+        if (dto.getAssignedTo() != null) {
+            AppUser user = appUserRepository.findById(dto.getAssignedTo())
+                    .orElseThrow(() -> new ApiException("Assigned user not found: " + dto.getAssignedTo(), HttpStatus.BAD_REQUEST));
+            entity.setAssignedTo(user);
+        } else {
+            entity.setAssignedTo(null);
+        }
 
-    public TestRunDTO executeCommand(UUID id, ExecutionCommandDTO cmd) {
-        TestRun run = repo.findById(id)
-                .orElseThrow(() -> new ApiException("Run not found: " + id, HttpStatus.NOT_FOUND));
+        if (dto.getVersionId() != null) {
+            Version version = versionRepository.findById(dto.getVersionId())
+                    .orElseThrow(() -> new ApiException("Version not found: " + dto.getVersionId(), HttpStatus.BAD_REQUEST));
+            entity.setVersion(version);
+        } else {
+            entity.setVersion(null);
+        }
 
-        run.setStatus("RUNNING");
-        run.setStartedAt(Instant.now());
+        if (dto.getConfigurationId() != null) {
+            Configuration config = configurationRepository.findById(dto.getConfigurationId())
+                    .orElseThrow(() -> new ApiException("Configuration not found: " + dto.getConfigurationId(), HttpStatus.BAD_REQUEST));
+            entity.setConfiguration(config);
+        } else {
+            entity.setConfiguration(null);
+        }
 
-        return toDto(repo.save(run));
-    }
+        if (dto.getEnvironmentIds() != null) {
+            List<Environment> envs = environmentRepository.findAllById(dto.getEnvironmentIds());
+            entity.setEnvironments(envs);
+        }
 
-    public void completeRun(UUID id) {
-        TestRun run = repo.findById(id)
-                .orElseThrow(() -> new ApiException("Run not found: " + id, HttpStatus.NOT_FOUND));
-        run.setStatus("COMPLETED");
-        run.setCompletedAt(Instant.now());
-        repo.save(run);
-    }
-
-    public TestRunDTO cloneRun(UUID id) {
-        TestRun original = repo.findById(id)
-                .orElseThrow(() -> new ApiException("Run not found: " + id, HttpStatus.NOT_FOUND));
-
-        TestRun clone = new TestRun();
-        clone.setId(UUID.randomUUID());
-        clone.setProjectId(original.getProjectId());
-        clone.setName(original.getName() + " (copy)");
-        clone.setDescription(original.getDescription());
-        clone.setAssignedTo(original.getAssignedTo());
-        clone.setStatus("DRAFT");
-        clone.setStartedAt(null);
-        clone.setCompletedAt(null);
-        clone.setCode(codeGeneratorService.generateNextCode("test_run", original.getProjectId(), "R-"));
-
-        return toDto(repo.save(clone));
-    }
-
-    private TestRunDTO toDto(TestRun e) {
-        TestRunDTO dto = new TestRunDTO();
-        dto.setId(e.getId());
-        dto.setProjectId(e.getProjectId());
-        dto.setName(e.getName());
-        dto.setDescription(e.getDescription());
-        dto.setAssignedTo(e.getAssignedTo());
-        dto.setStatus(e.getStatus());
-        dto.setStartedAt(e.getStartedAt());
-        dto.setCompletedAt(e.getCompletedAt());
-        dto.setCode(e.getCode());
-        return dto;
+        if (dto.getTestCaseIds() != null) {
+            List<TestCase> cases = testCaseRepository.findAllById(dto.getTestCaseIds());
+            entity.setTestCases(cases);
+        }
     }
 }

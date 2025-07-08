@@ -1,4 +1,3 @@
-// TestSuiteRepository.java
 package org.example.tmsstriker.repository;
 
 import org.example.tmsstriker.entity.TestSuite;
@@ -11,12 +10,14 @@ import java.util.List;
 public interface TestSuiteRepository extends JpaRepository<TestSuite, UUID> {
 
     // Для повного списку (без пагінації)
-    List<TestSuite> findByProjectId(UUID projectId);
+    List<TestSuite> findByProject_Id(UUID projectId);
 
     // Для пагінації (повертає Page)
-    Page<TestSuite> findByProjectId(UUID projectId, Pageable pageable);
+    Page<TestSuite> findByProject_Id(UUID projectId, Pageable pageable);
 
-    // Для дерева, якщо використовуєш parentId:
-    List<TestSuite> findByProjectIdAndParentIdIsNull(UUID projectId);
+    // Для дерева, якщо використовуєш parent (root-сьюти)
+    List<TestSuite> findByProject_IdAndParentIsNull(UUID projectId);
+
+    boolean existsByNameAndProject_Id(String name, UUID projectId);
+
 }
-

@@ -1,87 +1,92 @@
 package org.example.tmsstriker.service;
 
+import lombok.RequiredArgsConstructor;
 import org.example.tmsstriker.dto.ProjectDTO;
 import org.example.tmsstriker.entity.Project;
 import org.example.tmsstriker.exception.ApiException;
 import org.example.tmsstriker.repository.ProjectRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.example.tmsstriker.repository.TestCaseRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@RequiredArgsConstructor
 public class ProjectService {
-    private final ProjectRepository repo;
+
+    private final ProjectRepository repository;
+    private final TestCaseRepository testCaseRepository;
     private final CodeGeneratorService codeGeneratorService;
 
-    public ProjectService(ProjectRepository repo, CodeGeneratorService codeGeneratorService) {
-        this.repo = repo;
-        this.codeGeneratorService = codeGeneratorService;
-    }
-
-    public Page<ProjectDTO> getPagedProjects(String search, Pageable pageable) {
-        if (search == null || search.isBlank()) {
-            return repo.findAll(pageable).map(this::toDto);
-        } else {
-            return repo.findByNameContainingIgnoreCase(search, pageable).map(this::toDto);
-        }
-    }
-
-    public ProjectDTO findById(UUID id) {
-        return repo.findById(id)
+    @Transactional(readOnly = true)
+    public List<ProjectDTO> getAll() {
+        return repository.findAll().stream()
                 .map(this::toDto)
-                .orElseThrow(() -> new ApiException("Project not found: " + id, HttpStatus.NOT_FOUND));
+                .collect(Collectors.toList());
     }
 
+    /**
+     * Знаходить проєкт за ідентифікатором та повертає Optional DTO.
+     * Використовується в контролері для {@code GET /api/projects/{id}}.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ProjectDTO> findById(UUID id) {
+        return repository.findById(id)
+                .map(this::toDto);
+    }
+
+    @Transactional
     public ProjectDTO create(ProjectDTO dto) {
-        Project entity = toEntity(dto);
+        // --- Дублікати імені проекту ---
+        if (repository.existsByName(dto.getName())) {
+            throw new ApiException(
+                    "Duplicate project name: '" + dto.getName() + "'",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        Project entity = new Project();
         entity.setId(UUID.randomUUID());
+        entity.setName(dto.getName());
+        entity.setDescription(dto.getDescription());
+        entity.setCode(codeGeneratorService.generateNextCode("project", null, "PR-"));
 
-        // 🔢 Генерація унікального коду типу PR-1, PR-2...
-        String code = codeGeneratorService.generateNextCode("project", null, "PR-");
-        entity.setCode(code);
-
-        Project saved = repo.save(entity);
-        return toDto(saved);
+        return toDto(repository.save(entity));
     }
 
+    @Transactional
     public ProjectDTO update(UUID id, ProjectDTO dto) {
-        Project entity = repo.findById(id)
-                .orElseThrow(() -> new ApiException("Project not found: " + id, HttpStatus.NOT_FOUND));
+        Project entity = repository.findById(id)
+                .orElseThrow(() -> new ApiException("Project not found", HttpStatus.NOT_FOUND));
 
         entity.setName(dto.getName());
         entity.setDescription(dto.getDescription());
+        // code не змінюємо вручну
 
-        // 👇 Ми НЕ оновлюємо код вручну
-        // entity.setCode(dto.getCode());
-
-        Project saved = repo.save(entity);
-        return toDto(saved);
+        Project updated = repository.save(entity);
+        return toDto(updated);
     }
 
+    @Transactional
     public void delete(UUID id) {
-        repo.deleteById(id);
+        if (!repository.existsById(id)) {
+            throw new ApiException("Project not found", HttpStatus.NOT_FOUND);
+        }
+        repository.deleteById(id);
     }
 
-    private ProjectDTO toDto(Project e) {
+    private ProjectDTO toDto(Project entity) {
         ProjectDTO dto = new ProjectDTO();
-        dto.setId(e.getId());
-        dto.setName(e.getName());
-        dto.setDescription(e.getDescription());
-        dto.setCode(e.getCode());
+        dto.setId(entity.getId());
+        dto.setCode(entity.getCode());
+        dto.setName(entity.getName());
+        dto.setDescription(entity.getDescription());
+        dto.setTestCasesCount((int) testCaseRepository.countByProjectId(entity.getId()));
         return dto;
-    }
-
-    private Project toEntity(ProjectDTO dto) {
-        Project e = new Project();
-        if (dto.getId() != null) e.setId(dto.getId());
-        e.setName(dto.getName());
-        e.setDescription(dto.getDescription());
-        // 👇 Ми ігноруємо dto.getCode()
-        return e;
     }
 }

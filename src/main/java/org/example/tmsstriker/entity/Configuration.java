@@ -1,27 +1,25 @@
-// src/main/java/org/example/tmsstriker/entity/Configuration.java
 package org.example.tmsstriker.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
+import lombok.Data;
 import java.util.UUID;
 
 @Entity
-@Getter
-@Setter
+@Table(name = "configuration")
+@Data
 public class Configuration {
 
     @Id
     private UUID id;
 
+    @ManyToOne
+    @JoinColumn(name = "project_id", nullable = false)
+    private Project project; // <-- зв'язок із Project
+
     @Column(nullable = false)
-    private UUID projectId;
+    private String name;
 
-    @Column(nullable = false, length = 100)
-    private String title;
-
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String slug;
 
     @Column(columnDefinition = "TEXT")
@@ -36,4 +34,3 @@ public class Configuration {
     @Column(length = 50)
     private String device;
 }
-

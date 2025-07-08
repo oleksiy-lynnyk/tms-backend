@@ -1,101 +1,86 @@
 package org.example.tmsstriker.entity;
 
-import jakarta.persistence.*;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-
-import java.util.ArrayList;
+import jakarta.persistence.*;
+import org.hibernate.annotations.GenericGenerator;
 import java.util.List;
 import java.util.UUID;
 
-@Entity
 @Data
-@EqualsAndHashCode(callSuper = false)
+@Entity
+@Table(name = "test_case")
 public class TestCase {
+
     @Id
-    @GeneratedValue
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(
+            name = "UUID",
+            strategy = "org.hibernate.id.UUIDGenerator"
+    )
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 32)
+    @Column(nullable = false)
     private String code;
 
+    @Column(nullable = false)
     private String title;
-    private String preconditions;
-    private String description;
-    private String priority;
-    private String tags;
-    private String state;
-    private String owner;
-    private String type;
-    private String automationStatus;
-    private String component;
-    private String useCase;
-    private String requirement;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "suite_id", columnDefinition = "uuid")
+    @Column
+    private String preconditions;
+
+    @Column
+    private String description;
+
+    @OneToMany(mappedBy = "testCase", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TestStep> steps;
+
+    @Column
+    private String priority;
+    @Column
+    private String state;
+    @Column
+    private String type;
+    @Column
+    private String component;
+    @Column
+    private String automationStatus;
+    @Column
+    private String requirement;
+    @Column
+    private String owner;
+    @Column
+    private String tags;
+
+    @ManyToOne
+    @JoinColumn(name = "suite_id")
     private TestSuite testSuite;
 
-    @Column(name = "project_id", columnDefinition = "uuid", nullable = false)
-    private UUID projectId;
+    @ManyToOne
+    @JoinColumn(name = "project_id")
+    private Project project;
 
-    // Додаємо кроки
-    @OneToMany(mappedBy = "testCase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @OrderBy("orderIndex ASC")
-    private List<TestStep> steps = new ArrayList<>();
+    @Column
+    private String useCase;
 
-    public void setTestSuite(TestSuite suite) {
-        this.testSuite = suite;
-        if (suite != null) {
-            this.projectId = suite.getProjectId();
+    // Якщо вам потрібні геттери/сеттери suiteId окремо:
+    public UUID getSuiteId() {
+        return testSuite != null ? testSuite.getId() : null;
+    }
+
+    public void setSuiteId(UUID suiteId) {
+        if (suiteId == null) {
+            this.testSuite = null;
         } else {
-            this.projectId = null;
-        }
-    }
-
-    // Utility methods for bulk operations:
-    public void copyFieldsFrom(TestCase other) {
-        this.title = other.title;
-        this.preconditions = other.preconditions;
-        this.description = other.description;
-        this.priority = other.priority;
-        this.tags = other.tags;
-        this.state = other.state;
-        this.owner = other.owner;
-        this.type = other.type;
-        this.automationStatus = other.automationStatus;
-        this.component = other.component;
-        this.useCase = other.useCase;
-        this.requirement = other.requirement;
-        this.projectId = other.projectId;
-        // НЕ копіюємо steps тут, це окремо!
-    }
-
-    public void applyFieldOperation(String fieldName, Object operationDto) {
-        switch(fieldName) {
-            case "priority":
-                this.priority = operationDto.toString();
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown field: " + fieldName);
+            TestSuite suite = new TestSuite();
+            suite.setId(suiteId);
+            this.testSuite = suite;
         }
     }
 
     public void addStep(TestStep step) {
-        if (step != null) {
-            step.setId(null);            // <-- гарантуємо завжди новий крок!
-            step.setTestCase(this);      // Прив'язуємо до цього TestCase
-            this.steps.add(step);
-        }
+        if (steps == null) steps = new java.util.ArrayList<>();
+        steps.add(step);
+        step.setTestCase(this);
     }
-
-
-    public void removeStep(TestStep step) {
-        this.steps.remove(step);
-        step.setTestCase(null);
-    }
-
-
-
 }

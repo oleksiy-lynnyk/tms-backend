@@ -1,48 +1,55 @@
 package org.example.tmsstriker.entity;
 
+import lombok.Data;
 import jakarta.persistence.*;
 import java.util.UUID;
 
+@Data
 @Entity
-@Table(name = "test_suite", uniqueConstraints = @UniqueConstraint(columnNames = {"project_id", "code"}))
-
+@Table(name = "test_suite")
 public class TestSuite {
-
     @Id
-    @GeneratedValue
     private UUID id;
 
-    @Column(name = "project_id", nullable = false)
-    private UUID projectId;
+    @ManyToOne
+    @JoinColumn(name = "project_id", nullable = false)
+    private Project project;
 
-    @Column(name = "parent_id")
-    private UUID parentId;
-
-    @Column(name = "name")
+    @Column(nullable = false)
     private String name;
 
-    @Column(name = "description")
+    @Column
     private String description;
 
-    @Column(name = "code")
+    @ManyToOne
+    @JoinColumn(name = "parent_id")
+    private TestSuite parent;
+
+    @Column(unique = true)
     private String code;
 
-    // --- Геттери і сеттери ---
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    // Proxy-getters/setters (НЕ ДУБЛЮВАТИ як окремі поля)
+    public UUID getProjectId() {
+        return project != null ? project.getId() : null;
+    }
+    public void setProjectId(UUID id) {
+        if (this.project != null) this.project.setId(id);
+        else {
+            Project p = new Project();
+            p.setId(id);
+            this.project = p;
+        }
+    }
 
-    public UUID getProjectId() { return projectId; }
-    public void setProjectId(UUID projectId) { this.projectId = projectId; }
-
-    public UUID getParentId() { return parentId; }
-    public void setParentId(UUID parentId) { this.parentId = parentId; }
-
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
+    public UUID getParentId() {
+        return parent != null ? parent.getId() : null;
+    }
+    public void setParentId(UUID id) {
+        if (this.parent != null) this.parent.setId(id);
+        else if (id != null) {
+            TestSuite s = new TestSuite();
+            s.setId(id);
+            this.parent = s;
+        }
+    }
 }

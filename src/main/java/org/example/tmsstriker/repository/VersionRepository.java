@@ -7,6 +7,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface VersionRepository extends JpaRepository<Version, UUID> {
-    List<Version> findAllByProjectId(UUID projectId);
+    List<Version> findAllByProject_Id(UUID projectId);
 }
 
