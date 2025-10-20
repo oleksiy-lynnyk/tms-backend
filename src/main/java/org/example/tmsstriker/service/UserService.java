@@ -28,7 +28,7 @@ public class UserService {
 
     public List<UserShortDTO> findAllShort() {
         return userRepository.findAll().stream()
-                .map(this::toShortDto)
+                .map(user -> new UserShortDTO(user.getId(), user.getName()))
                 .collect(Collectors.toList());
     }
 
@@ -70,13 +70,7 @@ public class UserService {
     }
 
     // --- Маппери ---
-    public UserShortDTO toShortDto(User user) {
-        UserShortDTO dto = new UserShortDTO();
-        dto.setId(user.getId());
-        dto.setName(user.getName());
-        return dto;
-    }
-
+    
     public UserFullDTO toFullDto(User user) {
         UserFullDTO dto = new UserFullDTO();
         dto.setId(user.getId());
@@ -91,6 +85,4 @@ public class UserService {
                 .map(user -> new UserShortDTO(user.getId(), user.getName()))
                 .collect(Collectors.toList());
     }
-
 }
-
