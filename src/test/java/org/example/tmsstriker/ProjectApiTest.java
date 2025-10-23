@@ -111,7 +111,7 @@ class ProjectApiTest {
         TestSuiteDTO suite = new TestSuiteDTO();
         suite.setName("cascade-suite");
         suite.setProjectId(projectId);
-        UUID suiteId = rest.postForEntity("/api/testsuites", suite, TestSuiteDTO.class)
+        UUID suiteId = rest.postForEntity("/api/test-suites", suite, TestSuiteDTO.class)
                 .getBody().getId();
 
         // create case
@@ -119,7 +119,7 @@ class ProjectApiTest {
         c.setTitle("cascade-case");
         c.setProjectId(projectId);
         c.setSuiteId(suiteId);
-        UUID caseId = rest.postForEntity("/api/cases", c, TestCaseDTO.class)
+        UUID caseId = rest.postForEntity("/api/test-cases", c, TestCaseDTO.class)
                 .getBody().getId();
 
         // create run
@@ -127,7 +127,7 @@ class ProjectApiTest {
         run.setName("cascade-run");
         run.setProjectId(projectId);
         run.setTestCaseIds(List.of(caseId));
-        UUID runId = rest.postForEntity("/api/testruns", run, TestRunDTO.class)
+        UUID runId = rest.postForEntity("/api/test-runs", run, TestRunDTO.class)
                 .getBody().getId();
 
         // act: delete project
@@ -137,11 +137,11 @@ class ProjectApiTest {
         assertThat(rest.getForEntity(BASE + "/" + projectId, ProjectDTO.class)
                 .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 
-        assertThat(rest.getForEntity("/api/testsuites/" + suiteId, TestSuiteDTO.class)
+        assertThat(rest.getForEntity("/api/test-suites/" + suiteId, TestSuiteDTO.class)
                 .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(rest.getForEntity("/api/cases/" + caseId, TestCaseDTO.class)
+        assertThat(rest.getForEntity("/api/test-cases/" + caseId, TestCaseDTO.class)
                 .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(rest.getForEntity("/api/testruns/" + runId, TestRunDTO.class)
+        assertThat(rest.getForEntity("/api/test-runs/" + runId, TestRunDTO.class)
                 .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 

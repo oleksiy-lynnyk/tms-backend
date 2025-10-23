@@ -20,8 +20,8 @@ class TestCaseApiTest {
     @Autowired
     private TestRestTemplate rest;
 
-    private static final String SUITES = "/api/testsuites";
-    private static final String CASES  = "/api/cases";
+    private static final String SUITES = "/api/test-suites";
+    private static final String CASES  = "/api/test-cases";
 
     private UUID createSuite(UUID projectId) {
         TestSuiteDTO dto = new TestSuiteDTO();

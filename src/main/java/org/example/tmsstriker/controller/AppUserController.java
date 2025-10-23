@@ -11,6 +11,7 @@ import org.example.tmsstriker.dto.AppUserFullDTO;
 import org.example.tmsstriker.dto.AppUserShortDTO;
 import org.example.tmsstriker.service.AppUserService;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,8 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/AppUsers")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/app-users")
 @RequiredArgsConstructor
 public class AppUserController {
 
@@ -48,7 +48,7 @@ public class AppUserController {
     @PostMapping
     @Operation(summary = "Create new user", description = "Creates a new user.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "User created",
+            @ApiResponse(responseCode = "201", description = "User created",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = AppUserFullDTO.class))),
             @ApiResponse(responseCode = "400", description = "Invalid input", content = @Content)
@@ -57,7 +57,7 @@ public class AppUserController {
             @RequestBody(description = "User payload", required = true,
                     content = @Content(schema = @Schema(implementation = AppUserFullDTO.class)))
             @org.springframework.web.bind.annotation.RequestBody AppUserFullDTO dto) {
-        return ResponseEntity.ok(service.create(dto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
     }
 
     @GetMapping("/{id}")

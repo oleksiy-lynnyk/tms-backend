@@ -23,10 +23,10 @@ class TestRunCaseResultControllerTest {
     private TestRestTemplate rest;
 
     private static final String PROJECT_BASE = "/api/projects";
-    private static final String SUITE_BASE = "/api/testsuites";
-    private static final String CASE_BASE = "/api/cases";
-    private static final String RUN_BASE = "/api/testruns";
-    private static final String USER_BASE = "/api/AppUsers";
+    private static final String SUITE_BASE = "/api/test-suites";
+    private static final String CASE_BASE = "/api/test-cases";
+    private static final String RUN_BASE = "/api/test-runs";
+    private static final String USER_BASE = "/api/app-users";
 
     @Test
     @DisplayName("RES1: Set test case result → 200 + result saved")
@@ -40,7 +40,7 @@ class TestRunCaseResultControllerTest {
         result.setExecutedBy(user.getId());
 
         ResponseEntity<TestRunCaseResultDTO> resp = rest.postForEntity(
-                "/api/testruns/" + setup.runId + "/cases/" + setup.caseId + "/result",
+                "/api/test-runs/" + setup.runId + "/cases/" + setup.caseId + "/result",
                 result, TestRunCaseResultDTO.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -68,7 +68,7 @@ class TestRunCaseResultControllerTest {
         initialResult.setExecutedBy(user.getId());
 
         rest.postForEntity(
-                "/api/testruns/" + setup.runId + "/cases/" + setup.caseId + "/result",
+                "/api/test-runs/" + setup.runId + "/cases/" + setup.caseId + "/result",
                 initialResult, TestRunCaseResultDTO.class);
 
         // Оновити результат
@@ -78,7 +78,7 @@ class TestRunCaseResultControllerTest {
         updatedResult.setExecutedBy(user.getId());
 
         ResponseEntity<TestRunCaseResultDTO> resp = rest.postForEntity(
-                "/api/testruns/" + setup.runId + "/cases/" + setup.caseId + "/result",
+                "/api/test-runs/" + setup.runId + "/cases/" + setup.caseId + "/result",
                 updatedResult, TestRunCaseResultDTO.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -100,7 +100,7 @@ class TestRunCaseResultControllerTest {
         setTestCaseResult(setup.runId, setup.case3Id, "Skipped", "Third test skipped", user.getId());
 
         ResponseEntity<List<TestRunCaseResultDTO>> resp = rest.exchange(
-                "/api/testruns/" + setup.runId + "/cases",
+                "/api/test-runs/" + setup.runId + "/cases",
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<List<TestRunCaseResultDTO>>() {}
@@ -131,7 +131,7 @@ class TestRunCaseResultControllerTest {
         setTestCaseResult(setup.runId, setup.caseId, "Blocked", "Test blocked by environment issue", user.getId());
 
         ResponseEntity<TestRunCaseResultDTO> resp = rest.getForEntity(
-                "/api/testruns/" + setup.runId + "/cases/" + setup.caseId + "/result",
+                "/api/test-runs/" + setup.runId + "/cases/" + setup.caseId + "/result",
                 TestRunCaseResultDTO.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -151,7 +151,7 @@ class TestRunCaseResultControllerTest {
 
         // Не встановлювати результат, одразу спробувати отримати
         ResponseEntity<ErrorResponse> resp = rest.getForEntity(
-                "/api/testruns/" + setup.runId + "/cases/" + setup.caseId + "/result",
+                "/api/test-runs/" + setup.runId + "/cases/" + setup.caseId + "/result",
                 ErrorResponse.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -174,7 +174,7 @@ class TestRunCaseResultControllerTest {
             result.setExecutedBy(user.getId());
 
             ResponseEntity<TestRunCaseResultDTO> resp = rest.postForEntity(
-                    "/api/testruns/" + setup.runId + "/cases/" + caseIds[i] + "/result",
+                    "/api/test-runs/" + setup.runId + "/cases/" + caseIds[i] + "/result",
                     result, TestRunCaseResultDTO.class);
 
             assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -195,7 +195,7 @@ class TestRunCaseResultControllerTest {
         // executedBy не встановлюємо
 
         ResponseEntity<TestRunCaseResultDTO> resp = rest.postForEntity(
-                "/api/testruns/" + setup.runId + "/cases/" + setup.caseId + "/result",
+                "/api/test-runs/" + setup.runId + "/cases/" + setup.caseId + "/result",
                 result, TestRunCaseResultDTO.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -218,13 +218,13 @@ class TestRunCaseResultControllerTest {
 
         // Невалідний run ID
         ResponseEntity<ErrorResponse> resp1 = rest.postForEntity(
-                "/api/testruns/" + invalidRunId + "/cases/" + UUID.randomUUID() + "/result",
+                "/api/test-runs/" + invalidRunId + "/cases/" + UUID.randomUUID() + "/result",
                 result, ErrorResponse.class);
 
         // Невалідний case ID з існуючим run
         TestRunSetup setup = createTestRunWithCase();
         ResponseEntity<ErrorResponse> resp2 = rest.postForEntity(
-                "/api/testruns/" + setup.runId + "/cases/" + invalidCaseId + "/result",
+                "/api/test-runs/" + setup.runId + "/cases/" + invalidCaseId + "/result",
                 result, ErrorResponse.class);
 
         // Обидві повинні повернути помилку
@@ -350,7 +350,7 @@ class TestRunCaseResultControllerTest {
         result.setExecutedBy(executedBy);
 
         rest.postForEntity(
-                "/api/testruns/" + runId + "/cases/" + caseId + "/result",
+                "/api/test-runs/" + runId + "/cases/" + caseId + "/result",
                 result, TestRunCaseResultDTO.class);
     }
 }

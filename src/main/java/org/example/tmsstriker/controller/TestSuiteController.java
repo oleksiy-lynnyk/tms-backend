@@ -18,8 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/testsuites")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/test-suites")
 @RequiredArgsConstructor
 @Tag(name = "test-suite-controller", description = "API for managing test suits")
 public class TestSuiteController {

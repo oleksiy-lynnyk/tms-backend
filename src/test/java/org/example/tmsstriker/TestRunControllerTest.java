@@ -22,10 +22,10 @@ class TestRunControllerTest {
     @Autowired
     private TestRestTemplate rest;
 
-    private static final String BASE = "/api/testruns";
+    private static final String BASE = "/api/test-runs";
     private static final String PROJECT_BASE = "/api/projects";
-    private static final String SUITE_BASE = "/api/testsuites";
-    private static final String CASE_BASE = "/api/cases";
+    private static final String SUITE_BASE = "/api/test-suites";
+    private static final String CASE_BASE = "/api/test-cases";
 
     @Test
     @DisplayName("TR1: Create TestRun → 201 + body contains id")

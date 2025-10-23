@@ -18,11 +18,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/cases")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/test-cases")
 @RequiredArgsConstructor
 public class TestCaseController {
 
@@ -114,5 +115,38 @@ public class TestCaseController {
     ) throws Exception {
         ImportResultDto result = service.importFromCsv(suiteId, file.getInputStream());
         return ResponseEntity.ok(result);
+    }
+    @GetMapping("/search")
+    @Operation(summary = "Advanced search for test cases")
+    public ResponseEntity<Page<TestCaseDTO>> searchTestCases(
+            @RequestParam(required = false) UUID projectId,
+            @RequestParam(required = false) UUID suiteId,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String automationStatus,
+            @RequestParam(required = false) String owner,
+            @RequestParam(required = false) String tags,
+            @RequestParam(required = false) String component,
+            @RequestParam(required = false) String type,
+            Pageable pageable
+    ) {
+        // TODO: Реалізувати в сервісі
+        return ResponseEntity.ok(Page.empty());
+    }
+
+    // 🔍 НОВИЙ ENDPOINT: Get filter values
+    @GetMapping("/filters")
+    @Operation(summary = "Get available filter values")
+    public ResponseEntity<Map<String, List<String>>> getFilterValues(
+            @RequestParam(required = false) UUID projectId
+    ) {
+        // TODO: Реалізувати в сервісі
+        Map<String, List<String>> filters = Map.of(
+                "priorities", List.of("High", "Medium", "Low"),
+                "statuses", List.of("Active", "Draft", "Deprecated"),
+                "owners", List.of("john.doe", "jane.smith")
+        );
+        return ResponseEntity.ok(filters);
     }
 }

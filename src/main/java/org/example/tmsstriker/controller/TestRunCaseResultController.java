@@ -16,8 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/testruns/{runId}/cases")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/test-runs/{runId}/cases")
 @RequiredArgsConstructor
 @Tag(name = "test-run-case-result-controller", description = "API for managing test run case results")
 public class TestRunCaseResultController {

@@ -5,6 +5,8 @@ import org.example.tmsstriker.dto.VersionDTO;
 import org.example.tmsstriker.entity.Version;
 import org.example.tmsstriker.repository.VersionRepository;
 import org.example.tmsstriker.mapper.VersionMapper;
+import org.example.tmsstriker.exception.ApiException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,21 +26,40 @@ public class VersionService {
                 .collect(Collectors.toList());
     }
 
+    public VersionDTO findById(UUID id) {
+        Version version = repository.findById(id)
+                .orElseThrow(() -> new ApiException("Version not found", HttpStatus.NOT_FOUND));
+        return versionMapper.toDto(version);
+    }
+
     public VersionDTO create(VersionDTO dto) {
         Version version = versionMapper.toEntity(dto);
         version.setId(null);
+
+        // ✅ ВИПРАВЛЕНО: переконуємося що name заповнений
+        if (version.getName() == null && version.getTitle() != null) {
+            version.setName(version.getTitle());
+        }
+
         return versionMapper.toDto(repository.save(version));
     }
 
     public VersionDTO update(UUID id, VersionDTO dto) {
-        Version version = repository.findById(id).orElseThrow();
-        version.setTitle(dto.getTitle());             // ← тут title
+        Version version = repository.findById(id)
+                .orElseThrow(() -> new ApiException("Version not found", HttpStatus.NOT_FOUND));
+
+        version.setTitle(dto.getTitle());
+        version.setName(dto.getTitle());    // ✅ ДОДАНО: синхронізуємо name з title
         version.setSlug(dto.getSlug());
         version.setDescription(dto.getDescription());
+
         return versionMapper.toDto(repository.save(version));
     }
 
     public void delete(UUID id) {
+        if (!repository.existsById(id)) {
+            throw new ApiException("Version not found", HttpStatus.NOT_FOUND);
+        }
         repository.deleteById(id);
     }
 }

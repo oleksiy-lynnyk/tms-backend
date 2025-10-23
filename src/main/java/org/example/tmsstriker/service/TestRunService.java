@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;  // ✅ ДОДАНО
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -68,8 +69,12 @@ public class TestRunService {
         return mapper.toDto(updated);
     }
 
+    // ✅ ВИПРАВЛЕНО: замінено repository на testRunRepository
     @Transactional
     public void delete(UUID id) {
+        if (!testRunRepository.existsById(id)) {
+            throw new ApiException("TestRun not found", HttpStatus.NOT_FOUND);
+        }
         testRunRepository.deleteById(id);
     }
 
@@ -93,6 +98,7 @@ public class TestRunService {
         testRunRepository.save(entity);
     }
 
+    // ✅ ВИПРАВЛЕНО: використання нових ArrayList для колекцій
     @Transactional
     public TestRunDTO cloneRun(UUID id) {
         TestRun entity = testRunRepository.findById(id)
@@ -107,8 +113,15 @@ public class TestRunService {
         copy.setAssignedTo(entity.getAssignedTo());
         copy.setVersion(entity.getVersion());
         copy.setConfiguration(entity.getConfiguration());
-        copy.setEnvironments(entity.getEnvironments());
-        copy.setTestCases(entity.getTestCases());
+
+        // ✅ КРИТИЧНО: створити нові списки замість копіювання посилань
+        if (entity.getEnvironments() != null) {
+            copy.setEnvironments(new ArrayList<>(entity.getEnvironments()));
+        }
+        if (entity.getTestCases() != null) {
+            copy.setTestCases(new ArrayList<>(entity.getTestCases()));
+        }
+
         TestRun cloned = testRunRepository.save(copy);
         return mapper.toDto(cloned);
     }

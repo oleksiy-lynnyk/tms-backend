@@ -11,6 +11,6 @@ public class EnvironmentDTO {
     private String slug;
     private String description;
     private String host;
-    private int port;         // ← додайте
+    private Integer port;         // ← додайте
 }
 

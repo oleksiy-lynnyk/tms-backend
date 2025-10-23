@@ -25,7 +25,7 @@ class AppUserControllerTest {
     @Autowired
     private TestRestTemplate rest;
 
-    private static final String BASE = "/api/AppUsers";  // поки старий URL
+    private static final String BASE = "/api/app-users";  // поки старий URL
 
     @Test
     @DisplayName("AU1: Create User → 201 + body contains id")

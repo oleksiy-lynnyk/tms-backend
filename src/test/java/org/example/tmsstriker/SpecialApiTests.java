@@ -48,7 +48,7 @@ class SpecialApiTests {
         user.setEmail("status@test.com");
         user.setFullName("Status Test User");
 
-        ResponseEntity<AppUserFullDTO> userResp = rest.postForEntity("/api/AppUsers", user, AppUserFullDTO.class);
+        ResponseEntity<AppUserFullDTO> userResp = rest.postForEntity("/api/app-users", user, AppUserFullDTO.class);
         System.out.println("❌ AppUser POST status: " + userResp.getStatusCode() + " (should be 201)");
 
         // Project POST - should return 201
@@ -83,21 +83,21 @@ class SpecialApiTests {
         TestSuiteDTO suite = new TestSuiteDTO();
         suite.setProjectId(projectId);
         suite.setName("Status Test Suite");
-        ResponseEntity<TestSuiteDTO> suiteResp = rest.postForEntity("/api/testsuites", suite, TestSuiteDTO.class);
+        ResponseEntity<TestSuiteDTO> suiteResp = rest.postForEntity("/api/test-suites", suite, TestSuiteDTO.class);
         System.out.println("📊 TestSuite POST status: " + suiteResp.getStatusCode());
 
         // TestCase POST
         TestCaseDTO testCase = new TestCaseDTO();
         testCase.setTitle("Status Test Case");
         testCase.setSuiteId(suiteResp.getBody().getId());
-        ResponseEntity<TestCaseDTO> caseResp = rest.postForEntity("/api/cases", testCase, TestCaseDTO.class);
+        ResponseEntity<TestCaseDTO> caseResp = rest.postForEntity("/api/test-cases", testCase, TestCaseDTO.class);
         System.out.println("📊 TestCase POST status: " + caseResp.getStatusCode());
 
         // TestRun POST
         TestRunDTO testRun = new TestRunDTO();
         testRun.setName("Status Test Run");
         testRun.setProjectId(projectId);
-        ResponseEntity<TestRunDTO> runResp = rest.postForEntity("/api/testruns", testRun, TestRunDTO.class);
+        ResponseEntity<TestRunDTO> runResp = rest.postForEntity("/api/test-runs", testRun, TestRunDTO.class);
         System.out.println("📊 TestRun POST status: " + runResp.getStatusCode());
 
         // Звіт
@@ -124,7 +124,7 @@ class SpecialApiTests {
 
         // Test DELETE statuses
         ResponseEntity<Void> projectDel = rest.exchange("/api/projects/" + project.getId(), HttpMethod.DELETE, null, Void.class);
-        ResponseEntity<Void> userDel = rest.exchange("/api/AppUsers/" + user.getId(), HttpMethod.DELETE, null, Void.class);
+        ResponseEntity<Void> userDel = rest.exchange("/api/app-users/" + user.getId(), HttpMethod.DELETE, null, Void.class);
 
         System.out.println("📊 Project DELETE status: " + projectDel.getStatusCode());
         System.out.println("📊 AppUser DELETE status: " + userDel.getStatusCode());
@@ -211,7 +211,7 @@ class SpecialApiTests {
         }
 
         // Тест пагінації користувачів (має підтримувати)
-        ResponseEntity<String> userPageResp = rest.getForEntity("/api/AppUsers?page=0&size=2", String.class);
+        ResponseEntity<String> userPageResp = rest.getForEntity("/api/app-users?page=0&size=2", String.class);
         System.out.println("📊 AppUser pagination status: " + userPageResp.getStatusCode());
         String userBody = userPageResp.getBody();
         boolean hasPageStructure = userBody.contains("\"content\":") &&
@@ -249,7 +249,7 @@ class SpecialApiTests {
 
         System.out.println("\n📊 PAGINATION REPORT:");
         System.out.println("✅ ENDPOINTS WITH PAGINATION:");
-        System.out.println("  - /api/AppUsers - supports Page<AppUserFullDTO>");
+        System.out.println("  - /api/app-users - supports Page<AppUserFullDTO>");
 
         System.out.println("❌ ENDPOINTS WITHOUT PAGINATION:");
         System.out.println("  - /api/configurations/project/{id} - returns List<ConfigurationDTO>");
@@ -263,15 +263,15 @@ class SpecialApiTests {
         System.out.println("🔍 TESTING INVALID PAGINATION PARAMETERS");
 
         // Тестувати негативні значення
-        ResponseEntity<String> negativeResp = rest.getForEntity("/api/AppUsers?page=-1&size=-5", String.class);
+        ResponseEntity<String> negativeResp = rest.getForEntity("/api/app-users?page=-1&size=-5", String.class);
         System.out.println("📊 Negative page/size status: " + negativeResp.getStatusCode());
 
         // Тестувати дуже великий розмір
-        ResponseEntity<String> largeResp = rest.getForEntity("/api/AppUsers?page=0&size=10000", String.class);
+        ResponseEntity<String> largeResp = rest.getForEntity("/api/app-users?page=0&size=10000", String.class);
         System.out.println("📊 Large size status: " + largeResp.getStatusCode());
 
         // Тестувати некоректні типи
-        ResponseEntity<String> invalidResp = rest.getForEntity("/api/AppUsers?page=abc&size=xyz", String.class);
+        ResponseEntity<String> invalidResp = rest.getForEntity("/api/app-users?page=abc&size=xyz", String.class);
         System.out.println("📊 Invalid types status: " + invalidResp.getStatusCode());
 
         // Всі повинні або повернути помилку або застосувати дефолти
@@ -291,17 +291,17 @@ class SpecialApiTests {
 
         // Тестувати поточні URLs
         System.out.println("📊 CURRENT API ENDPOINTS:");
-        System.out.println("❌ /api/AppUsers - CamelCase (should be /api/app-users)");
-        System.out.println("❌ /api/cases - abbreviated (should be /api/test-cases)");
-        System.out.println("❌ /api/testsuites - one word (should be /api/test-suites)");
-        System.out.println("❌ /api/testruns - one word (should be /api/test-runs)");
+        System.out.println("❌ /api/app-users - CamelCase (should be /api/app-users)");
+        System.out.println("❌ /api/test-cases - abbreviated (should be /api/test-cases)");
+        System.out.println("❌ /api/test-suites - one word (should be /api/test-suites)");
+        System.out.println("❌ /api/test-runs - one word (should be /api/test-runs)");
         System.out.println("✅ /api/configurations - correct");
         System.out.println("✅ /api/environments - correct");
         System.out.println("✅ /api/projects - correct");
         System.out.println("✅ /api/versions - correct");
 
         // Переконатися що поточні URLs працюють
-        ResponseEntity<String> resp1 = rest.getForEntity("/api/AppUsers", String.class);
+        ResponseEntity<String> resp1 = rest.getForEntity("/api/app-users", String.class);
         ResponseEntity<String> resp2 = rest.getForEntity("/api/projects", String.class);
         ResponseEntity<String> resp3 = rest.getForEntity("/api/configurations", String.class);
 
@@ -351,8 +351,8 @@ class SpecialApiTests {
 
         // Тестувати 404 відповіді з різних endpoints
         ResponseEntity<ErrorResponse> projectError = rest.getForEntity("/api/projects/" + nonExistentId, ErrorResponse.class);
-        ResponseEntity<ErrorResponse> userError = rest.getForEntity("/api/AppUsers/" + nonExistentId, ErrorResponse.class);
-        ResponseEntity<String> caseError = rest.getForEntity("/api/cases/" + nonExistentId, String.class);
+        ResponseEntity<ErrorResponse> userError = rest.getForEntity("/api/app-users/" + nonExistentId, ErrorResponse.class);
+        ResponseEntity<String> caseError = rest.getForEntity("/api/test-cases/" + nonExistentId, String.class);
 
         System.out.println("📊 Project 404 status: " + projectError.getStatusCode());
         System.out.println("📊 User 404 status: " + userError.getStatusCode());
@@ -383,13 +383,13 @@ class SpecialApiTests {
         // Основні GET endpoints
         String[] getEndpoints = {
                 "/api/projects",
-                "/api/AppUsers",
+                "/api/app-users",
                 "/api/configurations",
                 "/api/environments",
                 "/api/versions",
-                "/api/testsuites",
-                "/api/cases",
-                "/api/testruns"
+                "/api/test-suites",
+                "/api/test-cases",
+                "/api/test-runs"
         };
 
         for (String endpoint : getEndpoints) {
@@ -445,7 +445,7 @@ class SpecialApiTests {
         user.setEmail(username + "@test.com");
         user.setFullName("Test User " + username);
 
-        ResponseEntity<AppUserFullDTO> resp = rest.postForEntity("/api/AppUsers", user, AppUserFullDTO.class);
+        ResponseEntity<AppUserFullDTO> resp = rest.postForEntity("/api/app-users", user, AppUserFullDTO.class);
         return resp.getBody();
     }
 }

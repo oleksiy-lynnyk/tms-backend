@@ -57,7 +57,7 @@ class FullFlowIntegrationTest {
         suiteDTO.setProjectId(projectId);
 
         ResponseEntity<TestSuiteDTO> suiteResponse =
-                rest.postForEntity("/api/testsuites", suiteDTO, TestSuiteDTO.class);
+                rest.postForEntity("/api/test-suites", suiteDTO, TestSuiteDTO.class);
         assertEquals(HttpStatus.CREATED, suiteResponse.getStatusCode());
         UUID suiteId = suiteResponse.getBody().getId();
         assertNotNull(suiteId);
@@ -70,7 +70,7 @@ class FullFlowIntegrationTest {
         caseDTO.setSuiteId(suiteId);
 
         ResponseEntity<TestCaseDTO> caseResponse =
-                rest.postForEntity("/api/cases", caseDTO, TestCaseDTO.class);
+                rest.postForEntity("/api/test-cases", caseDTO, TestCaseDTO.class);
         assertEquals(HttpStatus.CREATED, caseResponse.getStatusCode());
         UUID caseId = caseResponse.getBody().getId();
         assertNotNull(caseId);
@@ -82,7 +82,7 @@ class FullFlowIntegrationTest {
         runDTO.setTestCaseIds(List.of(caseId));
 
         ResponseEntity<TestRunDTO> runResponse =
-                rest.postForEntity("/api/testruns", runDTO, TestRunDTO.class);
+                rest.postForEntity("/api/test-runs", runDTO, TestRunDTO.class);
         assertEquals(HttpStatus.CREATED, runResponse.getStatusCode());
         UUID runId = runResponse.getBody().getId();
         assertNotNull(runId);
@@ -90,7 +90,7 @@ class FullFlowIntegrationTest {
 
         // 5) GET and verify Test Run
         ResponseEntity<TestRunDTO> getResponse =
-                rest.getForEntity("/api/testruns/" + runId, TestRunDTO.class);
+                rest.getForEntity("/api/test-runs/" + runId, TestRunDTO.class);
         assertEquals(HttpStatus.OK, getResponse.getStatusCode());
         assertTrue(getResponse.getBody().getTestCaseIds().contains(caseId));
     }

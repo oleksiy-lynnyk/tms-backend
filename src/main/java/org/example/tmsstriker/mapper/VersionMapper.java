@@ -8,10 +8,6 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.factory.Mappers;
 
-/**
- * Mapper for converting between Version entity and DTO.
- * Handles project association and ignores unmapped fields.
- */
 @Mapper(
         componentModel = "spring",
         nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
@@ -21,35 +17,33 @@ public interface VersionMapper {
 
     /**
      * Convert Version entity to DTO.
-     * Maps project.id to projectId.
+     * Maps project.id to projectId and title to title.
      */
     @Mapping(source = "project.id", target = "projectId")
+    @Mapping(source = "title", target = "title")  //
     VersionDTO toDto(Version entity);
 
     /**
      * Convert DTO to entity for creation.
-     * Ignores project (set in service layer) and id is left to service.
+     * Maps title to both title and name fields.
      */
     @Mapping(target = "project", ignore = true)
     @Mapping(target = "id", ignore = true)
+    @Mapping(source = "title", target = "title")  //
+    @Mapping(source = "title", target = "name")   //
     Version toEntity(VersionDTO dto);
 
     /**
      * Update an existing entity from DTO.
-     * Ignores project association and id.
-     * Implemented here as default method to ensure compilation.
      */
     default void updateEntityFromDto(VersionDTO dto, @MappingTarget Version entity) {
         if (dto == null || entity == null) {
             return;
         }
-        // manually map fields
+        // ✅ Виправлено: мапимо title в обидва поля
         entity.setTitle(dto.getTitle());
+        entity.setName(dto.getTitle());    // ✅ ДОДАНО: name = title
         entity.setSlug(dto.getSlug());
         entity.setDescription(dto.getDescription());
-        // project and id are managed separately
     }
 }
-
-
-

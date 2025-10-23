@@ -1,6 +1,7 @@
 package org.example.tmsstriker.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.tmsstriker.dto.EnvironmentDTO;
 import org.example.tmsstriker.entity.Environment;
 import org.example.tmsstriker.entity.Project;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class EnvironmentService {
 
     private final EnvironmentRepository repository;
@@ -26,8 +28,6 @@ public class EnvironmentService {
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
-
-    // Додати ці методи ПІСЛЯ getByProject() в EnvironmentService:
 
     public List<EnvironmentDTO> getAll() {
         return repository.findAll().stream()
@@ -42,34 +42,54 @@ public class EnvironmentService {
     }
 
     public EnvironmentDTO create(EnvironmentDTO dto) {
+        log.debug("Creating environment with DTO: {}", dto);
+
+        // Валідація обов'язкових полів
+        if (dto.getProjectId() == null) {
+            throw new ApiException("Project ID is required", HttpStatus.BAD_REQUEST);
+        }
+        if (dto.getName() == null || dto.getName().trim().isEmpty()) {
+            throw new ApiException("Environment name is required", HttpStatus.BAD_REQUEST);
+        }
+
         Environment entity = new Environment();
         entity.setId(UUID.randomUUID());
-        if (dto.getProjectId() != null) {
-            Project project = projectRepository.findById(dto.getProjectId())
-                    .orElseThrow(() -> new ApiException("Project not found", HttpStatus.NOT_FOUND));
-            entity.setProject(project);
-        }
-        entity.setName(dto.getName());
+
+        // Знайти та встановити проект
+        Project project = projectRepository.findById(dto.getProjectId())
+                .orElseThrow(() -> new ApiException("Project not found: " + dto.getProjectId(), HttpStatus.NOT_FOUND));
+        entity.setProject(project);
+
+        // Встановити інші поля
+        entity.setName(dto.getName().trim());
         entity.setSlug(dto.getSlug());
         entity.setDescription(dto.getDescription());
         entity.setHost(dto.getHost());
-        entity.setPort(dto.getPort());
-        return toDto(repository.save(entity));
+        entity.setPort(dto.getPort() != null ? dto.getPort() : 0); // Default port = 0
+
+        log.debug("Saving environment: {}", entity);
+        Environment saved = repository.save(entity);
+        log.debug("Environment saved with ID: {}", saved.getId());
+
+        return toDto(saved);
     }
 
     public EnvironmentDTO update(UUID id, EnvironmentDTO dto) {
         Environment entity = repository.findById(id)
                 .orElseThrow(() -> new ApiException("Environment not found", HttpStatus.NOT_FOUND));
-        if (dto.getProjectId() != null) {
+
+        if (dto.getProjectId() != null && !dto.getProjectId().equals(entity.getProject().getId())) {
             Project project = projectRepository.findById(dto.getProjectId())
                     .orElseThrow(() -> new ApiException("Project not found", HttpStatus.NOT_FOUND));
             entity.setProject(project);
         }
-        entity.setName(dto.getName());
-        entity.setSlug(dto.getSlug());
-        entity.setDescription(dto.getDescription());
-        entity.setHost(dto.getHost());
-        entity.setPort(dto.getPort());
+
+        if (dto.getName() != null) entity.setName(dto.getName().trim());
+        if (dto.getSlug() != null) entity.setSlug(dto.getSlug());
+        if (dto.getDescription() != null) entity.setDescription(dto.getDescription());
+        if (dto.getHost() != null) entity.setHost(dto.getHost());
+        if (dto.getPort() != null) entity.setPort(dto.getPort());
+
         return toDto(repository.save(entity));
     }
 

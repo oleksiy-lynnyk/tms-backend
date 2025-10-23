@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
-// -- прибрали імпорт io.swagger.v3.oas.annotations.parameters.RequestBody
 import lombok.RequiredArgsConstructor;
 import org.example.tmsstriker.dto.VersionDTO;
 import org.example.tmsstriker.service.VersionService;
@@ -29,19 +28,17 @@ public class VersionController {
     @Operation(summary = "Create a new version",
             description = "Creates a new version (milestone/release) under the specified project.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Version created",
+            @ApiResponse(responseCode = "201", description = "Version created",  // ✅ ВИПРАВЛЕНО: 200 → 201
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = VersionDTO.class))),
             @ApiResponse(responseCode = "400", description = "Invalid input", content = @Content)
     })
     public ResponseEntity<VersionDTO> create(
-            /* для Swagger-документації вручну вказуємо повний шлях до анотації */
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Payload for creating a version",
                     required = true,
                     content = @Content(schema = @Schema(implementation = VersionDTO.class))
             )
-            /* а це вже Spring-овий @RequestBody, який бере JSON з HTTP-запиту */
             @org.springframework.web.bind.annotation.RequestBody VersionDTO dto
     ) {
         VersionDTO created = versionService.create(dto);
@@ -87,6 +84,22 @@ public class VersionController {
     ) {
         List<VersionDTO> list = versionService.getByProject(projectId);
         return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get version by ID",  // ✅ ДОДАНО: Swagger документацію
+            description = "Returns version by its ID.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Version found",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = VersionDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Version not found", content = @Content)
+    })
+    public ResponseEntity<VersionDTO> getById(
+            @PathVariable @Schema(description = "UUID of the version to retrieve",
+                    example = "d6b0ee32-69f5-4f45-b445-6c7e7d3ad2f5") UUID id) {
+        VersionDTO version = versionService.findById(id);
+        return ResponseEntity.ok(version);
     }
 
     @DeleteMapping("/{id}")

@@ -19,8 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/testruns")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/test-runs")
 @RequiredArgsConstructor
 public class TestRunController {
 
@@ -45,7 +44,7 @@ public class TestRunController {
     @Operation(summary = "Create a new Test Run",
             description = "Creates a new Test Run.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Test Run created",
+            @ApiResponse(responseCode = "201", description = "Test Run created",  // ✅ ВИПРАВЛЕНО: 200 → 201
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = TestRunDTO.class))),
             @ApiResponse(responseCode = "400", description = "Invalid input", content = @Content)
     })
@@ -128,7 +127,7 @@ public class TestRunController {
             @ApiResponse(responseCode = "404", description = "Not found", content = @Content)
     })
     public ResponseEntity<Void> complete(@PathVariable UUID id) {
-        service.completeRun(id);
+        service.completeRun(id);  // ✅ ЗАЛИШЕНО: completeRun() існує в сервісі
         return ResponseEntity.ok().build();
     }
 

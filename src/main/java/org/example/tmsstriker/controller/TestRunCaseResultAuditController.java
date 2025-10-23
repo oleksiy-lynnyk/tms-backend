@@ -16,8 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/testruns/{runId}/cases/{caseId}/audit")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/test-runs/{runId}/cases/{caseId}/audit")
 @RequiredArgsConstructor
 @Tag(name = "test-run-case-result-audit-controller", description = "API for managing audit trail of test run case results")
 public class TestRunCaseResultAuditController {

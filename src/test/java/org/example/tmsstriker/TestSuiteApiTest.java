@@ -23,7 +23,7 @@ class TestSuiteApiTest {
     @Autowired
     private TestRestTemplate rest;
 
-    private static final String BASE = "/api/testsuites";
+    private static final String BASE = "/api/test-suites";
     private static final String PROJECT_BASE = "/api/projects";
 
     @Test
