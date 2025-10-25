@@ -2,29 +2,43 @@ package org.example.tmsstriker.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.GenericGenerator;
-
 import java.util.UUID;
 
 @Entity
-@Table(name = "version", uniqueConstraints = @UniqueConstraint(columnNames = {"project_id", "slug"}))
+@Table(name = "version")
 @Data
 public class Version {
 
     @Id
-    @GeneratedValue(generator = "uuid2")
-    @GenericGenerator(name = "uuid2", strategy = "uuid2")
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "project_id", nullable = false)
-    private UUID projectId;
+    @ManyToOne
+    @JoinColumn(name = "project_id", nullable = false)
+    private Project project;
 
     @Column(nullable = false)
     private String title;
 
     @Column(nullable = false)
+    private String name;
+
+    @Column(length = 50)
     private String slug;
 
-    @Column(columnDefinition = "TEXT")
+    @Column
     private String description;
+
+    // Якщо треба доступ до projectId окремо:
+    public UUID getProjectId() {
+        return project != null ? project.getId() : null;
+    }
+    public void setProjectId(UUID id) {
+        if (this.project != null) this.project.setId(id);
+        else if (id != null) {
+            Project p = new Project();
+            p.setId(id);
+            this.project = p;
+        }
+    }
 }

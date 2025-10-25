@@ -11,16 +11,16 @@ public class TestCaseDTO {
     private String title;
     private String preconditions;
     private String description;
+    private List<TestStepDTO> steps;
     private String priority;
-    private String tags;
     private String state;
-    private String owner;
     private String type;
-    private String automationStatus;
     private String component;
-    private String useCase;
+    private String automationStatus;
     private String requirement;
+    private String owner;
+    private String tags;
     private UUID suiteId;
     private UUID projectId;
-    private List<TestStepDTO> steps;
+    private String useCase; // якщо є
 }

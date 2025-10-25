@@ -6,6 +6,7 @@ import java.util.UUID;
 
 @Data
 public class ExecutionCommandDTO {
-    private UUID testRunId;
-    private String command;
+    private String command; // "start", "pause", "resume", "stop", "run_case"
+    private String comment; // опціонально
+    private String payload; // JSON-рядок для специфічних команд
 }

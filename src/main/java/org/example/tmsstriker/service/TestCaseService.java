@@ -1,13 +1,10 @@
 package org.example.tmsstriker.service;
 
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
-import org.example.tmsstriker.dto.BulkTestCaseRequestDTO;
-import org.example.tmsstriker.dto.ImportResultDto;
-import org.example.tmsstriker.dto.TestCaseDTO;
-import org.example.tmsstriker.dto.TestStepDTO;
-import org.example.tmsstriker.entity.TestCase;
-import org.example.tmsstriker.entity.TestStep;
+import org.example.tmsstriker.dto.*;
+import org.example.tmsstriker.entity.*;
 import org.example.tmsstriker.exception.ApiException;
 import org.example.tmsstriker.repository.TestCaseRepository;
 import org.example.tmsstriker.repository.TestSuiteRepository;
@@ -21,26 +18,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class TestCaseService {
+
     private final TestCaseRepository repo;
     private final TestSuiteRepository suiteRepo;
-    private final CodeGeneratorService codeGeneratorService; // Додаємо універсальний сервіс
-
-    public TestCaseService(
-            TestCaseRepository repo,
-            TestSuiteRepository suiteRepo,
-            CodeGeneratorService codeGeneratorService
-    ) {
-        this.repo = repo;
-        this.suiteRepo = suiteRepo;
-        this.codeGeneratorService = codeGeneratorService;
-    }
+    private final CodeGeneratorService codeGeneratorService;
 
     public TestCaseDTO getById(UUID id) {
         return repo.findById(id)
@@ -52,35 +39,40 @@ public class TestCaseService {
         Specification<TestCase> spec = Specification
                 .where(TestCaseSpecification.belongsToSuite(suiteId))
                 .and(TestCaseSpecification.containsTextInAnyField(search));
-        return repo.findAll(spec, pg)
-                .map(this::toDto);
+        return repo.findAll(spec, pg).map(this::toDto);
     }
+
+// В методі createTestCase змінити:
 
     @Transactional
     public TestCaseDTO createTestCase(TestCaseDTO dto) {
-        TestCase e = toEntity(dto);
-
         if (dto.getSuiteId() == null) {
             throw new ApiException("Suite is required", HttpStatus.BAD_REQUEST);
         }
-        suiteRepo.findById(dto.getSuiteId()).ifPresent(e::setTestSuite);
+        if (repo.existsByTitleAndTestSuite_Id(dto.getTitle(), dto.getSuiteId())) {
+            throw new ApiException(
+                    "Duplicate Test Case title: '" + dto.getTitle() + "' in suite " + dto.getSuiteId(),
+                    HttpStatus.CONFLICT
+            );
+        }
+        TestCase e = toEntity(dto);
 
-        // Генерація code для нового кейсу
+        // ВИПРАВЛЕНО: встановити suite та project
+        TestSuite suite = suiteRepo.findById(dto.getSuiteId())
+                .orElseThrow(() -> new ApiException("Suite not found: " + dto.getSuiteId(), HttpStatus.NOT_FOUND));
+        e.setTestSuite(suite);
+
+        // ДОДАНО: встановити project від suite
+        if (suite.getProject() != null) {
+            e.setProject(suite.getProject());
+        }
+
         if (e.getCode() == null || e.getCode().isEmpty()) {
             UUID projectId = getProjectId(dto, e);
             String code = codeGeneratorService.generateNextCode("test_case", projectId, "TC-");
             e.setCode(code);
         }
 
-        // Додаємо кроки
-        if (dto.getSteps() != null) {
-            for (int i = 0; i < dto.getSteps().size(); i++) {
-                TestStepDTO stepDto = dto.getSteps().get(i);
-                TestStep step = toTestStepEntity(stepDto);
-                step.setOrderIndex(stepDto.getOrderIndex() != null ? stepDto.getOrderIndex() : i);
-                e.addStep(step);
-            }
-        }
         return toDto(repo.save(e));
     }
 
@@ -112,13 +104,14 @@ public class TestCaseService {
         return toDto(repo.save(e));
     }
 
-    /** Оновлення списку кроків */
     private void updateSteps(TestCase entity, List<TestStepDTO> newSteps) {
         List<TestStep> existing = entity.getSteps();
-        existing.removeIf(oldStep ->
-                newSteps == null ||
-                        newSteps.stream().noneMatch(dto -> dto.getId() != null && dto.getId().equals(oldStep.getId()))
-        );
+        if (existing == null) {
+            existing = new ArrayList<>();
+            entity.setSteps(existing);
+        }
+        existing.removeIf(oldStep -> newSteps == null ||
+                newSteps.stream().noneMatch(dto -> dto.getId() != null && dto.getId().equals(oldStep.getId())));
         if (newSteps != null) {
             for (int i = 0; i < newSteps.size(); i++) {
                 TestStepDTO stepDto = newSteps.get(i);
@@ -126,8 +119,7 @@ public class TestCaseService {
                 if (stepDto.getId() != null) {
                     step = existing.stream()
                             .filter(s -> s.getId() != null && s.getId().equals(stepDto.getId()))
-                            .findFirst()
-                            .orElse(null);
+                            .findFirst().orElse(null);
                 }
                 if (step == null) {
                     step = new TestStep();
@@ -162,22 +154,27 @@ public class TestCaseService {
         if (req.getMoveToSuiteId() != null) {
             var dest = suiteRepo.findById(req.getMoveToSuiteId()).orElse(null);
             if (dest != null) {
-                cases.forEach(tc -> { tc.setTestSuite(dest); repo.save(tc); });
+                cases.forEach(tc -> {
+                    tc.setTestSuite(dest);
+                    repo.save(tc);
+                });
             }
         }
 
         if (req.getCopyToSuiteId() != null) {
             var dest = suiteRepo.findById(req.getCopyToSuiteId()).orElse(null);
             if (dest != null) {
-                UUID projectId = dest.getProjectId();
+                UUID projectId = dest.getProject() != null ? dest.getProject().getId() : null;
                 for (TestCase orig : cases) {
                     TestCase cp = new TestCase();
-                    cp.copyFieldsFrom(orig);
+                    copyFields(cp, orig);
                     cp.setTestSuite(dest);
-                    cp.setProjectId(projectId);
+                    if (projectId != null) {
+                        cp.setProject(new Project());
+                        cp.getProject().setId(projectId);
+                    }
                     String code = codeGeneratorService.generateNextCode("test_case", projectId, "TC-");
                     cp.setCode(code);
-
                     if (orig.getSteps() != null) {
                         for (TestStep step : orig.getSteps()) {
                             TestStep stepCopy = new TestStep();
@@ -191,22 +188,12 @@ public class TestCaseService {
                 }
             }
         }
-
-        if (req.getOperations() != null) {
-            cases.forEach(tc ->
-                    req.getOperations().forEach((field, op) ->
-                            tc.applyFieldOperation(field, op)
-                    )
-            );
-            repo.saveAll(cases);
-        }
     }
 
     @Transactional
     public ImportResultDto importFromCsv(UUID suiteId, InputStream in) throws Exception {
         ImportResultDto result = new ImportResultDto();
-        CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader()
-                .parse(new InputStreamReader(in));
+        CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(new InputStreamReader(in));
         int row = 1;
         for (var rec : parser) {
             try {
@@ -224,11 +211,10 @@ public class TestCaseService {
                 tc.setComponent(rec.get("component"));
                 tc.setUseCase(rec.get("useCase"));
                 tc.setRequirement(rec.get("requirement"));
-
-                UUID projectId = tc.getTestSuite().getProjectId();
+                UUID projectId = tc.getTestSuite() != null && tc.getTestSuite().getProject() != null
+                        ? tc.getTestSuite().getProject().getId() : null;
                 String code = codeGeneratorService.generateNextCode("test_case", projectId, "TC-");
                 tc.setCode(code);
-
                 repo.save(tc);
                 result.incrementCreated();
             } catch (Exception ex) {
@@ -239,15 +225,13 @@ public class TestCaseService {
         return result;
     }
 
-    /** Хелпер для отримання projectId */
     private UUID getProjectId(TestCaseDTO dto, TestCase entity) {
         if (dto.getProjectId() != null) return dto.getProjectId();
-        if (entity.getTestSuite() != null && entity.getTestSuite().getProjectId() != null)
-            return entity.getTestSuite().getProjectId();
+        if (entity.getTestSuite() != null && entity.getTestSuite().getProject() != null)
+            return entity.getTestSuite().getProject().getId();
         throw new ApiException("Project ID required for code generation", HttpStatus.BAD_REQUEST);
     }
 
-    // --- Маппери для кроків ---
     private TestCaseDTO toDto(TestCase e) {
         TestCaseDTO dto = new TestCaseDTO();
         dto.setId(e.getId());
@@ -255,11 +239,7 @@ public class TestCaseService {
         dto.setTitle(e.getTitle());
         dto.setPreconditions(e.getPreconditions());
         dto.setDescription(e.getDescription());
-        dto.setSteps(e.getSteps() == null ? null :
-                e.getSteps().stream()
-                        .map(this::toTestStepDTO)
-                        .collect(Collectors.toList())
-        );
+        dto.setSteps(e.getSteps() == null ? null : e.getSteps().stream().map(this::toTestStepDTO).collect(Collectors.toList()));
         dto.setPriority(e.getPriority());
         dto.setTags(e.getTags());
         dto.setState(e.getState());
@@ -270,11 +250,7 @@ public class TestCaseService {
         dto.setUseCase(e.getUseCase());
         dto.setRequirement(e.getRequirement());
         dto.setSuiteId(e.getTestSuite() != null ? e.getTestSuite().getId() : null);
-        dto.setProjectId(
-                e.getTestSuite() != null && e.getTestSuite().getProjectId() != null
-                        ? e.getTestSuite().getProjectId()
-                        : null
-        );
+        dto.setProjectId(e.getTestSuite() != null && e.getTestSuite().getProject() != null ? e.getTestSuite().getProject().getId() : null);
         return dto;
     }
 
@@ -294,13 +270,21 @@ public class TestCaseService {
         e.setComponent(dto.getComponent());
         e.setUseCase(dto.getUseCase());
         e.setRequirement(dto.getRequirement());
-        if (dto.getProjectId() != null) e.setProjectId(dto.getProjectId());
+        if (dto.getProjectId() != null) {
+            Project project = new Project();
+            project.setId(dto.getProjectId());
+            e.setProject(project);
+        }
+        if (dto.getSuiteId() != null) {
+            TestSuite suite = new TestSuite();
+            suite.setId(dto.getSuiteId());
+            e.setTestSuite(suite);
+        }
         if (dto.getSteps() != null) {
-            List<TestStep> steps = dto.getSteps().stream()
-                    .map(this::toTestStepEntity)
-                    .collect(Collectors.toList());
+            List<TestStep> steps = dto.getSteps().stream().map(this::toTestStepEntity).collect(Collectors.toList());
+            e.setSteps(steps);
             for (TestStep s : steps) {
-                e.addStep(s);
+                s.setTestCase(e);
             }
         }
         return e;
@@ -322,5 +306,20 @@ public class TestCaseService {
         dto.setAction(step.getAction());
         dto.setExpectedResult(step.getExpectedResult());
         return dto;
+    }
+
+    private void copyFields(TestCase dest, TestCase orig) {
+        dest.setTitle(orig.getTitle());
+        dest.setPreconditions(orig.getPreconditions());
+        dest.setDescription(orig.getDescription());
+        dest.setPriority(orig.getPriority());
+        dest.setTags(orig.getTags());
+        dest.setState(orig.getState());
+        dest.setOwner(orig.getOwner());
+        dest.setType(orig.getType());
+        dest.setAutomationStatus(orig.getAutomationStatus());
+        dest.setComponent(orig.getComponent());
+        dest.setUseCase(orig.getUseCase());
+        dest.setRequirement(orig.getRequirement());
     }
 }

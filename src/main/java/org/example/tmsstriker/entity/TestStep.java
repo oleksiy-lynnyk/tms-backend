@@ -1,32 +1,34 @@
 package org.example.tmsstriker.entity;
 
-import jakarta.persistence.*;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-
+import jakarta.persistence.*;
+import org.hibernate.annotations.GenericGenerator;
 import java.util.UUID;
 
-@Entity
 @Data
-@EqualsAndHashCode(callSuper = false)
+@Entity
+@Table(name = "test_step")
 public class TestStep {
+
     @Id
-    @GeneratedValue
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
+    @GeneratedValue(generator = "UUID")  // ДОДАНО!
+    @GenericGenerator(
+            name = "UUID",
+            strategy = "org.hibernate.id.UUIDGenerator"
+    )
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "test_case_id", columnDefinition = "uuid", nullable = false)
-    private TestCase testCase;
-
-    @Column(nullable = false)
-    private Integer orderIndex;
-
-    @Column(columnDefinition = "text")
+    @Column
     private String action;
 
-    @Column(columnDefinition = "text")
+    @Column
     private String expectedResult;
+
+    @Column
+    private Integer orderIndex;
+
+    @ManyToOne
+    @JoinColumn(name = "test_case_id")
+    private TestCase testCase;
 }
-
-
