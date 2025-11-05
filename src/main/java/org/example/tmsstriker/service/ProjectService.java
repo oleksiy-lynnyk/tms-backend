@@ -51,7 +51,7 @@ public class ProjectService {
         }
 
         Project entity = new Project();
-        entity.setId(UUID.randomUUID());
+        // НЕ ВСТАНОВЛЮЙТЕ ID ТУТ
         entity.setName(dto.getName());
         entity.setDescription(dto.getDescription());
         entity.setCode(codeGeneratorService.generateNextCode("project", null, "PR-"));
