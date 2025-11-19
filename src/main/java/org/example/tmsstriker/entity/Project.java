@@ -32,5 +32,9 @@ public class Project {
     // Каскадне видалення всіх тест-ранів при видаленні проекту
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TestRun> runs;
+
+    // Члени проекту з їх ролями
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProjectMember> members;
 }
 

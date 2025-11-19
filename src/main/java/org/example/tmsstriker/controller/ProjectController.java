@@ -25,13 +25,14 @@ public class ProjectController {
     private final ProjectService service;
 
     @GetMapping
-    @Operation(summary = "Get all projects", description = "Returns list of all projects.")
+    @Operation(summary = "Get all projects", description = "Returns list of all projects. If userId is provided, returns only projects accessible to that user.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful retrieval",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ProjectDTO.class)))
     })
-    public ResponseEntity<List<ProjectDTO>> getAll() {
-        List<ProjectDTO> list = service.getAll();
+    public ResponseEntity<List<ProjectDTO>> getAll(
+            @RequestParam(required = false) @Schema(description = "Optional user ID to filter projects", example = "d6b0ee32-69f5-4f45-b445-6c7e7d3ad2f5") UUID userId) {
+        List<ProjectDTO> list = userId != null ? service.getProjectsForUser(userId) : service.getAll();
         return ResponseEntity.ok(list);
     }
 

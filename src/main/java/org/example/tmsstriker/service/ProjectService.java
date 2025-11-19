@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.tmsstriker.dto.ProjectDTO;
 import org.example.tmsstriker.entity.Project;
 import org.example.tmsstriker.exception.ApiException;
+import org.example.tmsstriker.repository.ProjectMemberRepository;
 import org.example.tmsstriker.repository.ProjectRepository;
 import org.example.tmsstriker.repository.TestCaseRepository;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ public class ProjectService {
     private final ProjectRepository repository;
     private final TestCaseRepository testCaseRepository;
     private final CodeGeneratorService codeGeneratorService;
+    private final ProjectMemberRepository memberRepository;
 
     @Transactional(readOnly = true)
     public List<ProjectDTO> getAll() {
@@ -78,6 +80,42 @@ public class ProjectService {
             throw new ApiException("Project not found", HttpStatus.NOT_FOUND);
         }
         repository.deleteById(id);
+    }
+
+    /**
+     * Отримати проекти, до яких користувач має доступ
+     * @param userId ID користувача (якщо null - повернути всі проекти)
+     * @return Список проектів
+     */
+    @Transactional(readOnly = true)
+    public List<ProjectDTO> getProjectsForUser(UUID userId) {
+        if (userId == null) {
+            return getAll();
+        }
+
+        // Отримати ID проектів, до яких користувач має доступ
+        List<UUID> projectIds = memberRepository.findProjectIdsByUserId(userId);
+
+        // Якщо користувач не має доступу до жодного проекту
+        if (projectIds.isEmpty()) {
+            return List.of();
+        }
+
+        // Отримати проекти за ID
+        return repository.findAllById(projectIds).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Перевірити, чи має користувач доступ до проекту
+     */
+    @Transactional(readOnly = true)
+    public boolean hasUserAccessToProject(UUID projectId, UUID userId) {
+        if (userId == null) {
+            return false;
+        }
+        return memberRepository.existsByProjectIdAndUserId(projectId, userId);
     }
 
     private ProjectDTO toDto(Project entity) {
